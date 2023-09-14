@@ -1,0 +1,18 @@
+[package]
+name = "dice_box"
+version = "0.1.0"
+edition = "2021"
+description = "Testing ground for better cargo scheduler"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "dice_box"
+path = "src/main.rs"
+
+[lib]
+name = "dice_box"
+path = "src/dice_box/lib.rs"
+
+[dependencies]
+serde = "1.0"
+clap = {version = "4.0", features = ["derive"]}
