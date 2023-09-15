@@ -14,34 +14,17 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
-/// Possible artifacts that can be produced by compilations, used as edge values
-/// in the dependency graph.
-///
-/// As edge values we can have multiple kinds of edges depending on one node,
-/// for example some units may only depend on the metadata for an rlib while
-/// others depend on the full rlib. This `Artifact` enum is used to distinguish
-/// this case and track the progress of compilations as they proceed.
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(super) enum Artifact {
-    /// A generic placeholder for "depends on everything run by a step" and
-    /// means that we can't start the next compilation until the previous has
-    /// finished entirely.
-    All,
+use crate::artifact::Artifact;
 
-    /// A node indicating that we only depend on the metadata of a compilation,
-    /// but the compilation is typically also producing an rlib. We can start
-    /// our step, however, before the full rlib is available.
-    Metadata,
-}
-
+type N = Artifact;
 #[derive(Debug)]
-pub(super) struct DependencyQueue<N: Hash + Eq, E: Hash + Eq, V> {
+pub(super) struct DependencyQueue {
     /// A list of all known keys to build.
     ///
     /// The value of the hash map is list of dependencies which still need to be
     /// built before the package can be built. Note that the set is dynamically
     /// updated as more dependencies are built.
-    dep_map: HashMap<N, (HashSet<(N, E)>, V)>,
+    dep_map: HashMap<N, HashSet<N>>,
 
     /// A reverse mapping of a package to all packages that depend on that
     /// package.
@@ -51,7 +34,7 @@ pub(super) struct DependencyQueue<N: Hash + Eq, E: Hash + Eq, V> {
     ///
     /// This is sort of like a `HashMap<(N, E), HashSet<N>>` map, but more
     /// easily indexable with just an `N`
-    reverse_dep_map: HashMap<N, HashMap<E, HashSet<N>>>,
+    reverse_dep_map: HashMap<N, HashSet<N>>,
 
     /// The relative priority of this package. Higher values should be scheduled sooner.
     priority: HashMap<N, usize>,
@@ -60,9 +43,9 @@ pub(super) struct DependencyQueue<N: Hash + Eq, E: Hash + Eq, V> {
     cost: HashMap<N, usize>,
 }
 
-impl<N: Hash + Eq, E: Hash + Eq, V> DependencyQueue<N, E, V> {
+impl DependencyQueue {
     /// Creates a new dependency queue with 0 packages.
-    pub fn new() -> DependencyQueue<N, E, V> {
+    pub fn new() -> Self {
         DependencyQueue {
             dep_map: HashMap::new(),
             reverse_dep_map: HashMap::new(),
@@ -72,7 +55,7 @@ impl<N: Hash + Eq, E: Hash + Eq, V> DependencyQueue<N, E, V> {
     }
 }
 
-impl<N: Hash + Eq + Clone, E: Eq + Hash + Clone, V> DependencyQueue<N, E, V> {
+impl DependencyQueue {
     /// Adds a new node and its dependencies to this queue.
     ///
     /// The `key` specified is a new node in the dependency graph, and the node
@@ -88,26 +71,18 @@ impl<N: Hash + Eq + Clone, E: Eq + Hash + Clone, V> DependencyQueue<N, E, V> {
     /// this node. This implementation does not care about the units of this value, so
     /// the calling code is free to use whatever they'd like. In general, higher cost
     /// nodes are expected to take longer to build.
-    pub fn queue(
-        &mut self,
-        key: N,
-        value: V,
-        dependencies: impl IntoIterator<Item = (N, E)>,
-        cost: usize,
-    ) {
+    pub fn queue(&mut self, key: N, dependencies: impl IntoIterator<Item = N>, cost: usize) {
         assert!(!self.dep_map.contains_key(&key));
 
         let mut my_dependencies = HashSet::new();
-        for (dep, edge) in dependencies {
-            my_dependencies.insert((dep.clone(), edge.clone()));
+        for dep in dependencies {
+            my_dependencies.insert(dep.clone());
             self.reverse_dep_map
                 .entry(dep)
-                .or_insert_with(HashMap::new)
-                .entry(edge)
                 .or_insert_with(HashSet::new)
                 .insert(key.clone());
         }
-        self.dep_map.insert(key.clone(), (my_dependencies, value));
+        self.dep_map.insert(key.clone(), my_dependencies);
         self.cost.insert(key, cost);
     }
 
@@ -131,9 +106,9 @@ impl<N: Hash + Eq + Clone, E: Eq + Hash + Clone, V> DependencyQueue<N, E, V> {
         /// set of nodes which depend on it, including transitively. This is different
         /// from self.reverse_dep_map because self.reverse_dep_map only maps one level
         /// of reverse dependencies.
-        fn depth<'a, N: Hash + Eq + Clone, E: Hash + Eq + Clone>(
+        fn depth<'a>(
             key: &N,
-            map: &HashMap<N, HashMap<E, HashSet<N>>>,
+            map: &HashMap<N, HashSet<N>>,
             results: &'a mut HashMap<N, HashSet<N>>,
         ) -> &'a HashSet<N> {
             if results.contains_key(key) {
@@ -146,12 +121,7 @@ impl<N: Hash + Eq + Clone, E: Eq + Hash + Clone, V> DependencyQueue<N, E, V> {
             let mut set = HashSet::new();
             set.insert(key.clone());
 
-            for dep in map
-                .get(key)
-                .into_iter()
-                .flat_map(|it| it.values())
-                .flatten()
-            {
+            for dep in map.get(key).into_iter().flatten() {
                 set.extend(depth(dep, map, results).iter().cloned())
             }
 
@@ -165,15 +135,16 @@ impl<N: Hash + Eq + Clone, E: Eq + Hash + Clone, V> DependencyQueue<N, E, V> {
     ///
     /// A package is ready to be built when it has 0 un-built dependencies. If
     /// `None` is returned then no packages are ready to be built.
-    pub fn dequeue(&mut self) -> Option<(N, V, usize)> {
-        let (key, priority) = self
+    pub fn dequeue(&mut self) -> Option<N> {
+        let key = self
             .dep_map
             .iter()
-            .filter(|(_, (deps, _))| deps.is_empty())
-            .map(|(key, _)| (key.clone(), self.priority[key]))
-            .max_by_key(|(_, priority)| *priority)?;
-        let (_, data) = self.dep_map.remove(&key).unwrap();
-        Some((key, data, priority))
+            .filter(|(_, deps)| deps.is_empty())
+            .next()?
+            .0
+            .clone();
+        let _ = self.dep_map.remove(&key).unwrap();
+        Some(key)
     }
 
     /// Returns `true` if there are remaining packages to be built.
@@ -194,16 +165,16 @@ impl<N: Hash + Eq + Clone, E: Eq + Hash + Clone, V> DependencyQueue<N, E, V> {
     ///
     /// Returns the nodes that are now allowed to be dequeued as a result of
     /// finishing this node.
-    pub fn finish(&mut self, node: &N, edge: &E) -> Vec<&N> {
+    pub fn finish(&mut self, node: &N) -> Vec<&N> {
         // hashset<Node>
-        let reverse_deps = self.reverse_dep_map.get(node).and_then(|map| map.get(edge));
+        let reverse_deps = self.reverse_dep_map.get(node);
         let Some(reverse_deps) = reverse_deps else {
             return Vec::new();
         };
-        let key = (node.clone(), edge.clone());
+        let key = node.clone();
         let mut result = Vec::new();
         for dep in reverse_deps.iter() {
-            let edges = &mut self.dep_map.get_mut(dep).unwrap().0;
+            let edges = &mut self.dep_map.get_mut(dep).unwrap();
             assert!(edges.remove(&key));
             if edges.is_empty() {
                 result.push(dep);

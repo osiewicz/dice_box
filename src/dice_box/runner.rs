@@ -1,4 +1,5 @@
-use crate::dependency_queue::{Artifact, DependencyQueue};
+use crate::artifact::Artifact;
+use crate::dependency_queue::DependencyQueue;
 
 /// Makespan length, in seconds, of a given schedule.
 pub struct Makespan(pub usize);
@@ -12,14 +13,14 @@ trait HintProvider {
 
 #[derive(Clone, PartialEq)]
 struct Task {
-    artifact: (),
+    artifact: Artifact,
     end_time: usize,
 }
 
 pub struct Runner {
     current_time: usize,
     hints: Box<dyn HintProvider>,
-    queue: DependencyQueue<(), Artifact, ()>,
+    queue: DependencyQueue,
     running_tasks: Vec<Option<Task>>,
 }
 
@@ -63,7 +64,7 @@ impl Runner {
     }
     fn schedule_new_tasks(&mut self) {
         while self.free_slots() > 0 {
-            if let Some((new_task, _, _)) = self.queue.dequeue() {
+            if let Some(new_task) = self.queue.dequeue() {
                 let slot_for_task = self
                     .running_tasks
                     .iter_mut()
