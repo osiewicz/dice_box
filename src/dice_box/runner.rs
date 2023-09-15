@@ -5,8 +5,8 @@ use crate::dependency_queue::DependencyQueue;
 pub struct Makespan(pub usize);
 
 /// Whenever Runner has a scheduling decision to make, it will consult it's hint provider.
-trait HintProvider {
-    fn suggest_next(&self, _: &[()]) -> Option<usize> {
+pub(super) trait HintProvider: std::fmt::Debug {
+    fn suggest_next(&self, _: &[Artifact]) -> Option<usize> {
         None
     }
 }
@@ -19,17 +19,15 @@ struct Task {
 
 pub struct Runner {
     current_time: usize,
-    hints: Box<dyn HintProvider>,
     queue: DependencyQueue,
     running_tasks: Vec<Option<Task>>,
 }
 
 impl Runner {
-    fn new(hints: Box<dyn HintProvider>, num_threads: usize) -> Self {
+    fn new(queue: DependencyQueue, num_threads: usize) -> Self {
         Self {
-            hints,
             running_tasks: vec![None; num_threads],
-            queue: DependencyQueue::new(),
+            queue,
             current_time: 0,
         }
     }

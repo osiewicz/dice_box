@@ -16,7 +16,6 @@ use std::hash::Hash;
 
 use crate::artifact::Artifact;
 
-type N = Artifact;
 #[derive(Debug)]
 pub(super) struct DependencyQueue {
     /// A list of all known keys to build.
@@ -24,38 +23,34 @@ pub(super) struct DependencyQueue {
     /// The value of the hash map is list of dependencies which still need to be
     /// built before the package can be built. Note that the set is dynamically
     /// updated as more dependencies are built.
-    dep_map: HashMap<N, HashSet<N>>,
+    dep_map: HashMap<Artifact, HashSet<Artifact>>,
 
     /// A reverse mapping of a package to all packages that depend on that
     /// package.
     ///
     /// This map is statically known and does not get updated throughout the
     /// lifecycle of the DependencyQueue.
-    ///
-    /// This is sort of like a `HashMap<(N, E), HashSet<N>>` map, but more
-    /// easily indexable with just an `N`
-    reverse_dep_map: HashMap<N, HashSet<N>>,
+    reverse_dep_map: HashMap<Artifact, HashSet<Artifact>>,
 
     /// The relative priority of this package. Higher values should be scheduled sooner.
-    priority: HashMap<N, usize>,
+    priority: HashMap<Artifact, usize>,
 
     /// An expected cost for building this package. Used to determine priority.
-    cost: HashMap<N, usize>,
+    cost: HashMap<Artifact, usize>,
+
+    hints: Box<dyn super::runner::HintProvider>,
 }
 
 impl DependencyQueue {
-    /// Creates a new dependency queue with 0 packages.
-    pub fn new() -> Self {
+    pub fn new(hints: Box<dyn super::runner::HintProvider>) -> Self {
         DependencyQueue {
             dep_map: HashMap::new(),
             reverse_dep_map: HashMap::new(),
             priority: HashMap::new(),
             cost: HashMap::new(),
+            hints,
         }
     }
-}
-
-impl DependencyQueue {
     /// Adds a new node and its dependencies to this queue.
     ///
     /// The `key` specified is a new node in the dependency graph, and the node
@@ -71,7 +66,12 @@ impl DependencyQueue {
     /// this node. This implementation does not care about the units of this value, so
     /// the calling code is free to use whatever they'd like. In general, higher cost
     /// nodes are expected to take longer to build.
-    pub fn queue(&mut self, key: N, dependencies: impl IntoIterator<Item = N>, cost: usize) {
+    pub fn queue(
+        &mut self,
+        key: Artifact,
+        dependencies: impl IntoIterator<Item = Artifact>,
+        cost: usize,
+    ) {
         assert!(!self.dep_map.contains_key(&key));
 
         let mut my_dependencies = HashSet::new();
@@ -107,10 +107,10 @@ impl DependencyQueue {
         /// from self.reverse_dep_map because self.reverse_dep_map only maps one level
         /// of reverse dependencies.
         fn depth<'a>(
-            key: &N,
-            map: &HashMap<N, HashSet<N>>,
-            results: &'a mut HashMap<N, HashSet<N>>,
-        ) -> &'a HashSet<N> {
+            key: &Artifact,
+            map: &HashMap<Artifact, HashSet<Artifact>>,
+            results: &'a mut HashMap<Artifact, HashSet<Artifact>>,
+        ) -> &'a HashSet<Artifact> {
             if results.contains_key(key) {
                 let depth = &results[key];
                 assert!(!depth.is_empty(), "cycle in DependencyQueue");
@@ -135,7 +135,7 @@ impl DependencyQueue {
     ///
     /// A package is ready to be built when it has 0 un-built dependencies. If
     /// `None` is returned then no packages are ready to be built.
-    pub fn dequeue(&mut self) -> Option<N> {
+    pub fn dequeue(&mut self) -> Option<Artifact> {
         let key = self
             .dep_map
             .iter()
@@ -165,8 +165,8 @@ impl DependencyQueue {
     ///
     /// Returns the nodes that are now allowed to be dequeued as a result of
     /// finishing this node.
-    pub fn finish(&mut self, node: &N) -> Vec<&N> {
-        // hashset<Node>
+    pub fn finish(&mut self, node: &Artifact) -> Vec<&Artifact> {
+        // hashset<Artifactode>
         let reverse_deps = self.reverse_dep_map.get(node);
         let Some(reverse_deps) = reverse_deps else {
             return Vec::new();
