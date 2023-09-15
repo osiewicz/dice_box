@@ -60,12 +60,6 @@ pub(super) struct DependencyQueue<N: Hash + Eq, E: Hash + Eq, V> {
     cost: HashMap<N, usize>,
 }
 
-impl<N: Hash + Eq, E: Hash + Eq, V> Default for DependencyQueue<N, E, V> {
-    fn default() -> DependencyQueue<N, E, V> {
-        DependencyQueue::new()
-    }
-}
-
 impl<N: Hash + Eq, E: Hash + Eq, V> DependencyQueue<N, E, V> {
     /// Creates a new dependency queue with 0 packages.
     pub fn new() -> DependencyQueue<N, E, V> {

@@ -5,7 +5,7 @@ pub struct Makespan(pub usize);
 
 /// Whenever Runner has a scheduling decision to make, it will consult it's hint provider.
 trait HintProvider {
-    fn suggest_next(&self, candidates: &[()]) -> Option<usize> {
+    fn suggest_next(&self, _: &[()]) -> Option<usize> {
         None
     }
 }
