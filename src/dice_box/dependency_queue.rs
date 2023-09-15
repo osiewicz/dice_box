@@ -14,8 +14,28 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
+/// Possible artifacts that can be produced by compilations, used as edge values
+/// in the dependency graph.
+///
+/// As edge values we can have multiple kinds of edges depending on one node,
+/// for example some units may only depend on the metadata for an rlib while
+/// others depend on the full rlib. This `Artifact` enum is used to distinguish
+/// this case and track the progress of compilations as they proceed.
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub(super) enum Artifact {
+    /// A generic placeholder for "depends on everything run by a step" and
+    /// means that we can't start the next compilation until the previous has
+    /// finished entirely.
+    All,
+
+    /// A node indicating that we only depend on the metadata of a compilation,
+    /// but the compilation is typically also producing an rlib. We can start
+    /// our step, however, before the full rlib is available.
+    Metadata,
+}
+
 #[derive(Debug)]
-pub struct DependencyQueue<N: Hash + Eq, E: Hash + Eq, V> {
+pub(super) struct DependencyQueue<N: Hash + Eq, E: Hash + Eq, V> {
     /// A list of all known keys to build.
     ///
     /// The value of the hash map is list of dependencies which still need to be
