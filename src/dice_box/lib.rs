@@ -1,3 +1,4 @@
+mod artifact;
 mod cli;
 mod dependency_queue;
 mod runner;
