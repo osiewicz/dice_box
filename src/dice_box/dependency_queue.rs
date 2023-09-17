@@ -13,9 +13,25 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::artifact::Artifact;
+use crate::{artifact::Artifact, hints::HintProvider};
 
 #[derive(Debug)]
+pub(crate) struct DependencyQueueBuilder {
+    /// A list of all known keys to build.
+    ///
+    /// The value of the hash map is list of dependencies which still need to be
+    /// built before the package can be built. Note that the set is dynamically
+    /// updated as more dependencies are built.
+    dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
+
+    /// A reverse mapping of a package to all packages that depend on that
+    /// package.
+    ///
+    /// This map is statically known and does not get updated throughout the
+    /// lifecycle of the DependencyQueue.
+    reverse_dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
+}
+
 pub struct DependencyQueue {
     /// A list of all known keys to build.
     ///
@@ -30,16 +46,14 @@ pub struct DependencyQueue {
     /// This map is statically known and does not get updated throughout the
     /// lifecycle of the DependencyQueue.
     reverse_dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
-
     hints: Box<dyn super::hints::HintProvider>,
 }
 
-impl DependencyQueue {
-    pub fn new(hints: Box<dyn super::hints::HintProvider>) -> Self {
-        DependencyQueue {
+impl DependencyQueueBuilder {
+    pub fn new() -> Self {
+        Self {
             dep_map: BTreeMap::new(),
             reverse_dep_map: BTreeMap::new(),
-            hints,
         }
     }
     /// Adds a new node and its dependencies to this queue.
@@ -65,6 +79,16 @@ impl DependencyQueue {
         self.dep_map.insert(key.clone(), my_dependencies);
     }
 
+    pub fn finish(self, hints: Box<dyn HintProvider>) -> DependencyQueue {
+        DependencyQueue {
+            dep_map: self.dep_map,
+            reverse_dep_map: self.reverse_dep_map,
+            hints,
+        }
+    }
+}
+
+impl DependencyQueue {
     /// Dequeues a package that is ready to be built.
     ///
     /// A package is ready to be built when it has 0 un-built dependencies. If

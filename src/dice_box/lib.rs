@@ -7,7 +7,7 @@ mod timings;
 mod unit_graph;
 
 pub use cli::Cli;
-use dependency_queue::DependencyQueue;
+use dependency_queue::{DependencyQueue, DependencyQueueBuilder};
 pub use runner::Runner;
 pub use timings::parse;
 use unit_graph::unit_graph_to_artifacts;
@@ -23,10 +23,10 @@ pub fn create_dependency_queue(
         hints::ChooseTypeProvider::new(artifact::ArtifactType::BuildScriptBuild),
         hints::ChooseTypeProvider::new(artifact::ArtifactType::BuildScriptRun),
     ]);
-    let mut ret = DependencyQueue::new(hints);
+    let mut ret = DependencyQueueBuilder::new();
     let artifact_units = unit_graph_to_artifacts(graph, separate_codegen);
     for unit in artifact_units {
         ret.queue(unit.artifact, unit.dependencies);
     }
-    ret
+    ret.finish(hints)
 }

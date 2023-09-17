@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::artifact::{Artifact, ArtifactType};
+use crate::artifact::Artifact;
 use crate::dependency_queue::DependencyQueue;
 use crate::timings::TimingInfo;
 
