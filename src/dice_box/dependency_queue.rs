@@ -32,12 +32,6 @@ pub struct DependencyQueue {
     /// lifecycle of the DependencyQueue.
     reverse_dep_map: HashMap<Artifact, HashSet<Artifact>>,
 
-    /// The relative priority of this package. Higher values should be scheduled sooner.
-    priority: HashMap<Artifact, usize>,
-
-    /// An expected cost for building this package. Used to determine priority.
-    cost: HashMap<Artifact, usize>,
-
     hints: Box<dyn super::runner::HintProvider>,
 }
 
@@ -46,8 +40,6 @@ impl DependencyQueue {
         DependencyQueue {
             dep_map: HashMap::new(),
             reverse_dep_map: HashMap::new(),
-            priority: HashMap::new(),
-            cost: HashMap::new(),
             hints,
         }
     }
@@ -72,62 +64,20 @@ impl DependencyQueue {
         self.dep_map.insert(key.clone(), my_dependencies);
     }
 
-    /// All nodes have been added, calculate some internal metadata and prepare
-    /// for `dequeue`.
-    pub fn queue_finished(&mut self) {
-        let mut out = HashMap::new();
-        for key in self.dep_map.keys() {
-            depth(key, &self.reverse_dep_map, &mut out);
-        }
-        self.priority = out
-            .into_iter()
-            .map(|(n, set)| {
-                let total_cost =
-                    self.cost[&n] + set.iter().map(|key| self.cost[key]).sum::<usize>();
-                (n, total_cost)
-            })
-            .collect();
-
-        /// Creates a flattened reverse dependency list. For a given key, finds the
-        /// set of nodes which depend on it, including transitively. This is different
-        /// from self.reverse_dep_map because self.reverse_dep_map only maps one level
-        /// of reverse dependencies.
-        fn depth<'a>(
-            key: &Artifact,
-            map: &HashMap<Artifact, HashSet<Artifact>>,
-            results: &'a mut HashMap<Artifact, HashSet<Artifact>>,
-        ) -> &'a HashSet<Artifact> {
-            if results.contains_key(key) {
-                let depth = &results[key];
-                assert!(!depth.is_empty(), "cycle in DependencyQueue");
-                return depth;
-            }
-            results.insert(key.clone(), HashSet::new());
-
-            let mut set = HashSet::new();
-            set.insert(key.clone());
-
-            for dep in map.get(key).into_iter().flatten() {
-                set.extend(depth(dep, map, results).iter().cloned())
-            }
-
-            let slot = results.get_mut(key).unwrap();
-            *slot = set;
-            &*slot
-        }
-    }
-
     /// Dequeues a package that is ready to be built.
     ///
     /// A package is ready to be built when it has 0 un-built dependencies. If
     /// `None` is returned then no packages are ready to be built.
     pub fn dequeue(&mut self) -> Option<Artifact> {
-        let key = self
+        let candidates: Vec<&Artifact> = self
             .dep_map
             .iter()
-            .filter(|(_, deps)| deps.is_empty())
-            .next()?
-            .0
+            .filter_map(|(artifact, deps)| deps.is_empty().then_some(artifact))
+            .collect();
+        let key = self
+            .hints
+            .suggest_next(&candidates)
+            .or_else(|| candidates.into_iter().next())?
             .clone();
         let _ = self.dep_map.remove(&key).unwrap();
         Some(key)

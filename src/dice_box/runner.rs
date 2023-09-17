@@ -7,7 +7,7 @@ pub struct Makespan(pub usize);
 
 /// Whenever Runner has a scheduling decision to make, it will consult it's hint provider.
 pub(super) trait HintProvider: std::fmt::Debug {
-    fn suggest_next(&self, _: &[Artifact]) -> Option<usize> {
+    fn suggest_next(&self, _: &[&Artifact]) -> Option<&Artifact> {
         None
     }
 }
