@@ -18,15 +18,16 @@ pub fn create_dependency_queue(
     graph: unit_graph::UnitGraph,
     separate_codegen: bool,
 ) -> DependencyQueue {
-    let hints = hints::AggregateHintProvider::new([
-        hints::ChooseTypeProvider::new(artifact::ArtifactType::Metadata),
-        hints::ChooseTypeProvider::new(artifact::ArtifactType::BuildScriptBuild),
-        hints::ChooseTypeProvider::new(artifact::ArtifactType::BuildScriptRun),
-    ]);
     let mut ret = DependencyQueueBuilder::new();
     let artifact_units = unit_graph_to_artifacts(graph, separate_codegen);
     for unit in artifact_units {
         ret.queue(unit.artifact, unit.dependencies);
     }
+    let hints = hints::AggregateHintProvider::new([
+        dependency_queue::CargoHints::new(&ret),
+        hints::ChooseTypeProvider::new(artifact::ArtifactType::Metadata),
+        hints::ChooseTypeProvider::new(artifact::ArtifactType::BuildScriptBuild),
+        hints::ChooseTypeProvider::new(artifact::ArtifactType::BuildScriptRun),
+    ]);
     ret.finish(hints)
 }

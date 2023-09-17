@@ -144,3 +144,62 @@ impl DependencyQueue {
         result
     }
 }
+
+#[derive(Debug)]
+pub(super) struct CargoHints {
+    priority: BTreeMap<Artifact, usize>,
+}
+
+impl HintProvider for CargoHints {
+    fn suggest_next<'a>(&self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
+        timings
+            .iter()
+            .max_by_key(|artifact| self.priority[artifact])
+            .cloned()
+    }
+}
+
+impl CargoHints {
+    pub(super) fn new(deps: &DependencyQueueBuilder) -> Box<dyn HintProvider> {
+        let mut out = BTreeMap::new();
+        for key in deps.dep_map.keys() {
+            depth(key, &deps.reverse_dep_map, &mut out);
+        }
+        let priority = out
+            .into_iter()
+            .map(|(n, set)| {
+                let total_cost = 10 + set.iter().map(|_| 10).sum::<usize>();
+                (n, total_cost)
+            })
+            .collect();
+
+        /// Creates a flattened reverse dependency list. For a given key, finds the
+        /// set of nodes which depend on it, including transitively. This is different
+        /// from self.reverse_dep_map because self.reverse_dep_map only maps one level
+        /// of reverse dependencies.
+        fn depth<'a>(
+            key: &Artifact,
+            map: &BTreeMap<Artifact, BTreeSet<Artifact>>,
+            results: &'a mut BTreeMap<Artifact, BTreeSet<Artifact>>,
+        ) -> &'a BTreeSet<Artifact> {
+            if results.contains_key(key) {
+                let depth = &results[key];
+                assert!(!depth.is_empty(), "cycle in DependencyQueue");
+                return depth;
+            }
+            results.insert(key.clone(), BTreeSet::new());
+
+            let mut set = BTreeSet::new();
+            set.insert(key.clone());
+
+            for dep in map.get(key).into_iter().flat_map(|it| it.iter()) {
+                set.extend(depth(dep, map, results).iter().cloned())
+            }
+
+            let slot = results.get_mut(key).unwrap();
+            *slot = set;
+            &*slot
+        }
+        Box::new(Self { priority })
+    }
+}
