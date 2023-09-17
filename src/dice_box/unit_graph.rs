@@ -19,7 +19,5 @@ struct Unit {
 
 #[derive(Debug, Deserialize)]
 pub struct UnitGraph {
-    version: usize,
     units: Vec<Unit>,
-    roots: Vec<UnitIndex>,
 }
