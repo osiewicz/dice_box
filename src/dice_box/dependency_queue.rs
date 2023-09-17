@@ -11,7 +11,7 @@
 //! some nodes may only require one of the outputs and can start before the
 //! whole node is finished.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::hash::Hash;
 
 use crate::artifact::Artifact;
@@ -23,14 +23,14 @@ pub struct DependencyQueue {
     /// The value of the hash map is list of dependencies which still need to be
     /// built before the package can be built. Note that the set is dynamically
     /// updated as more dependencies are built.
-    dep_map: HashMap<Artifact, HashSet<Artifact>>,
+    dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
 
     /// A reverse mapping of a package to all packages that depend on that
     /// package.
     ///
     /// This map is statically known and does not get updated throughout the
     /// lifecycle of the DependencyQueue.
-    reverse_dep_map: HashMap<Artifact, HashSet<Artifact>>,
+    reverse_dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
 
     hints: Box<dyn super::runner::HintProvider>,
 }
@@ -38,8 +38,8 @@ pub struct DependencyQueue {
 impl DependencyQueue {
     pub fn new(hints: Box<dyn super::runner::HintProvider>) -> Self {
         DependencyQueue {
-            dep_map: HashMap::new(),
-            reverse_dep_map: HashMap::new(),
+            dep_map: BTreeMap::new(),
+            reverse_dep_map: BTreeMap::new(),
             hints,
         }
     }
@@ -51,14 +51,16 @@ impl DependencyQueue {
     /// productions from nodes (aka if it's just `()` it's just waiting for the
     /// node to finish).
     pub fn queue(&mut self, key: Artifact, dependencies: impl IntoIterator<Item = Artifact>) {
-        assert!(!self.dep_map.contains_key(&key));
+        if self.dep_map.contains_key(&key) {
+            return;
+        }
 
-        let mut my_dependencies = HashSet::new();
+        let mut my_dependencies = BTreeSet::new();
         for dep in dependencies {
             my_dependencies.insert(dep.clone());
             self.reverse_dep_map
                 .entry(dep)
-                .or_insert_with(HashSet::new)
+                .or_insert_with(BTreeSet::new)
                 .insert(key.clone());
         }
         self.dep_map.insert(key.clone(), my_dependencies);

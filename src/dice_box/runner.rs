@@ -1,5 +1,8 @@
-use crate::artifact::Artifact;
+use std::collections::BTreeMap;
+
+use crate::artifact::{Artifact, ArtifactType};
 use crate::dependency_queue::DependencyQueue;
+use crate::timings::TimingInfo;
 
 /// Makespan length, in seconds, of a given schedule.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -7,7 +10,7 @@ pub struct Makespan(pub usize);
 
 /// Whenever Runner has a scheduling decision to make, it will consult it's hint provider.
 pub(super) trait HintProvider: std::fmt::Debug {
-    fn suggest_next(&self, _: &[&Artifact]) -> Option<&Artifact> {
+    fn suggest_next<'a>(&self, items: &[&'a Artifact]) -> Option<&'a Artifact> {
         None
     }
 }
@@ -24,14 +27,20 @@ struct Task {
 pub struct Runner {
     current_time: usize,
     queue: DependencyQueue,
+    timings: BTreeMap<Artifact, TimingInfo>,
     running_tasks: Vec<Option<Task>>,
 }
 
 impl Runner {
-    pub fn new(queue: DependencyQueue, num_threads: usize) -> Self {
+    pub fn new(
+        queue: DependencyQueue,
+        timings: BTreeMap<Artifact, TimingInfo>,
+        num_threads: usize,
+    ) -> Self {
         Self {
             running_tasks: vec![None; num_threads],
             queue,
+            timings,
             current_time: 0,
         }
     }
@@ -51,7 +60,8 @@ impl Runner {
             // Clean out any tasks that end at the minimum quantum.
             if let Some(task) = maybe_task.as_ref() {
                 if task == &task_to_remove {
-                    maybe_task.take();
+                    let finished = maybe_task.take();
+                    self.queue.finish(&finished.unwrap().artifact);
                 }
             }
             true
@@ -76,8 +86,9 @@ impl Runner {
                     .find(|slot| slot.is_none())
                     .expect("There should be at least one empty slot in the queue at this point, as we wouldn't be in the loop otherwise.");
                 *slot_for_task = Some(Task {
+                    end_time: self.current_time
+                        + (self.timings[&new_task].duration * 100.) as usize,
                     artifact: new_task,
-                    end_time: self.current_time + 0,
                 });
             } else {
                 break;

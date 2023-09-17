@@ -22,7 +22,7 @@ pub enum ArtifactType {
     Link,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, PartialOrd)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, PartialOrd, Ord)]
 pub struct Artifact {
     pub typ: ArtifactType,
     pub package_id: String,
