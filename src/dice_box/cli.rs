@@ -13,4 +13,8 @@ pub struct Cli {
 
     #[clap(short, long, default_value_t = 10)]
     pub num_threads: usize,
+
+    /// Whether to treat codegen of a crate as a separate step from metadata generation.
+    #[clap(long, default_value_t = false)]
+    pub separate_codegen: bool,
 }

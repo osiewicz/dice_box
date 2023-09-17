@@ -8,30 +8,6 @@ use crate::timings::TimingInfo;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Makespan(pub usize);
 
-/// Whenever Runner has a scheduling decision to make, it will consult it's hint provider.
-pub trait HintProvider: std::fmt::Debug {
-    fn suggest_next<'a>(&self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
-        timings
-            .iter()
-            .find(|f| f.typ == ArtifactType::Metadata)
-            .cloned()
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct NoHintsProvider;
-impl HintProvider for NoHintsProvider {}
-
-#[derive(Debug)]
-struct AggregateHintProvider(Vec<Box<dyn HintProvider>>);
-
-impl HintProvider for AggregateHintProvider {
-    fn suggest_next<'a>(&self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
-        self.0
-            .iter()
-            .find_map(|provider| provider.suggest_next(timings))
-    }
-}
 #[derive(Clone, Debug, PartialEq)]
 struct Task {
     artifact: Artifact,

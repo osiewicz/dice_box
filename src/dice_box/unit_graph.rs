@@ -28,7 +28,10 @@ pub(crate) struct ArtifactUnit {
     pub(crate) dependencies: Vec<Artifact>,
 }
 
-pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
+pub(crate) fn unit_graph_to_artifacts(
+    graph: UnitGraph,
+    separate_codegen: bool,
+) -> Vec<ArtifactUnit> {
     fn unit_to_artifact(unit: &Unit) -> Artifact {
         let typ = node_type(&unit.mode, &unit.target);
         Artifact {
@@ -44,7 +47,7 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
             .iter()
             .map(|dep| unit_to_artifact(&graph.units[dep.index]))
             .collect();
-        if artifact.typ == ArtifactType::Metadata {
+        if separate_codegen && artifact.typ == ArtifactType::Metadata {
             ret.push(ArtifactUnit {
                 artifact: Artifact {
                     typ: ArtifactType::Codegen,

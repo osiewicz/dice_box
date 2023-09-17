@@ -31,11 +31,11 @@ pub struct DependencyQueue {
     /// lifecycle of the DependencyQueue.
     reverse_dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
 
-    hints: Box<dyn super::runner::HintProvider>,
+    hints: Box<dyn super::hints::HintProvider>,
 }
 
 impl DependencyQueue {
-    pub fn new(hints: Box<dyn super::runner::HintProvider>) -> Self {
+    pub fn new(hints: Box<dyn super::hints::HintProvider>) -> Self {
         DependencyQueue {
             dep_map: BTreeMap::new(),
             reverse_dep_map: BTreeMap::new(),

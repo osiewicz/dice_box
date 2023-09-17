@@ -63,7 +63,7 @@ impl Target {
     }
 }
 
-pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
+pub fn parse(contents: String, separate_codegen: bool) -> BTreeMap<Artifact, TimingInfo> {
     let mut out = BTreeMap::new();
     for line in contents.lines() {
         if !line.starts_with('{') {
@@ -71,7 +71,7 @@ pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
         }
         let mut timing: TimingInfo = serde_json::from_str(line).unwrap();
         let typ = timing.node_type();
-        if typ == ArtifactType::Metadata {
+        if separate_codegen && typ == ArtifactType::Metadata {
             assert!(
                 timing.rmeta_time.is_some(),
                 "{:?}",
