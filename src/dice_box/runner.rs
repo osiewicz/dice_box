@@ -21,6 +21,17 @@ pub trait HintProvider: std::fmt::Debug {
 #[derive(Debug)]
 pub(super) struct NoHintsProvider;
 impl HintProvider for NoHintsProvider {}
+
+#[derive(Debug)]
+struct AggregateHintProvider(Vec<Box<dyn HintProvider>>);
+
+impl HintProvider for AggregateHintProvider {
+    fn suggest_next<'a>(&self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
+        self.0
+            .iter()
+            .find_map(|provider| provider.suggest_next(timings))
+    }
+}
 #[derive(Clone, Debug, PartialEq)]
 struct Task {
     artifact: Artifact,

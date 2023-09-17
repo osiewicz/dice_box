@@ -42,10 +42,7 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
         let dependencies = unit
             .dependencies
             .iter()
-            .map(|dep| {
-                let mut ret = unit_to_artifact(&graph.units[dep.index]);
-                ret
-            })
+            .map(|dep| unit_to_artifact(&graph.units[dep.index]))
             .collect();
         if artifact.typ == ArtifactType::Metadata {
             ret.push(ArtifactUnit {
