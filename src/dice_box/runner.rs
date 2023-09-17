@@ -2,6 +2,7 @@ use crate::artifact::Artifact;
 use crate::dependency_queue::DependencyQueue;
 
 /// Makespan length, in seconds, of a given schedule.
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Makespan(pub usize);
 
 /// Whenever Runner has a scheduling decision to make, it will consult it's hint provider.
@@ -11,6 +12,9 @@ pub(super) trait HintProvider: std::fmt::Debug {
     }
 }
 
+#[derive(Debug)]
+pub(super) struct NoHintsProvider;
+impl HintProvider for NoHintsProvider {}
 #[derive(Clone, PartialEq)]
 struct Task {
     artifact: Artifact,
@@ -24,7 +28,7 @@ pub struct Runner {
 }
 
 impl Runner {
-    fn new(queue: DependencyQueue, num_threads: usize) -> Self {
+    pub fn new(queue: DependencyQueue, num_threads: usize) -> Self {
         Self {
             running_tasks: vec![None; num_threads],
             queue,
@@ -33,13 +37,16 @@ impl Runner {
     }
 
     fn run_next_task_to_completion(&mut self) {
-        let task_to_remove = self
+        let Some(task_to_remove) = self
             .running_tasks
             .iter()
+            .filter(|f| f.is_some())
             .min_by_key(|task| task.as_ref().and_then(|t| Some(t.end_time)))
             .cloned()
             .flatten()
-            .expect("There must be at least one task");
+        else {
+            return;
+        };
         self.running_tasks.retain_mut(|maybe_task| {
             // Clean out any tasks that end at the minimum quantum.
             if let Some(task) = maybe_task.as_ref() {

@@ -17,7 +17,7 @@ use std::hash::Hash;
 use crate::artifact::Artifact;
 
 #[derive(Debug)]
-pub(super) struct DependencyQueue {
+pub struct DependencyQueue {
     /// A list of all known keys to build.
     ///
     /// The value of the hash map is list of dependencies which still need to be
@@ -58,20 +58,7 @@ impl DependencyQueue {
     /// dependency is a node/edge pair, where edges can be thought of as
     /// productions from nodes (aka if it's just `()` it's just waiting for the
     /// node to finish).
-    ///
-    /// An optional `value` can also be associated with `key` which is reclaimed
-    /// when the node is ready to go.
-    ///
-    /// The cost parameter can be used to hint at the relative cost of building
-    /// this node. This implementation does not care about the units of this value, so
-    /// the calling code is free to use whatever they'd like. In general, higher cost
-    /// nodes are expected to take longer to build.
-    pub fn queue(
-        &mut self,
-        key: Artifact,
-        dependencies: impl IntoIterator<Item = Artifact>,
-        cost: usize,
-    ) {
+    pub fn queue(&mut self, key: Artifact, dependencies: impl IntoIterator<Item = Artifact>) {
         assert!(!self.dep_map.contains_key(&key));
 
         let mut my_dependencies = HashSet::new();
@@ -83,7 +70,6 @@ impl DependencyQueue {
                 .insert(key.clone());
         }
         self.dep_map.insert(key.clone(), my_dependencies);
-        self.cost.insert(key, cost);
     }
 
     /// All nodes have been added, calculate some internal metadata and prepare

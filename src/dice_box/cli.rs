@@ -10,4 +10,7 @@ pub struct Cli {
 
     /// Output file
     pub dependency_graph_file: PathBuf,
+
+    #[clap(short, long, default_value_t = 10)]
+    pub num_threads: usize,
 }
