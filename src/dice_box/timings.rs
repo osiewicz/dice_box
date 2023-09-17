@@ -4,21 +4,23 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::artifact::{Artifact, ArtifactType};
+use crate::{
+    artifact::{Artifact, ArtifactType},
+    PackageId,
+};
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum BuildMode {
     RunCustomBuild,
     Build,
 }
-type PackageId = String;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct TimingInfo {
     mode: BuildMode,
     pub duration: f64,
     rmeta_time: Option<f64>,
-    package_id: String,
+    package_id: PackageId,
     target: Target,
 }
 
@@ -67,7 +69,7 @@ pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
         if !line.starts_with('{') {
             continue;
         }
-        let mut timing: TimingInfo = serde_json::from_str(line).unwrap();
+        let timing: TimingInfo = serde_json::from_str(line).unwrap();
         let typ = timing.node_type();
         /* if typ == ArtifactType::Metadata {
             assert!(
@@ -88,7 +90,7 @@ pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
             // ... and for Metadata unit we're about to insert, just use rmeta_time
             timing.duration = timing.rmeta_time.take().unwrap();
         }*/
-        let current_entry = out.insert(
+        let _ = out.insert(
             Artifact {
                 package_id: timing.package_id.clone(),
                 typ,

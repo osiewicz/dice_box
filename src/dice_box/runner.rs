@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::artifact::{Artifact, ArtifactType};
+use crate::artifact::Artifact;
 use crate::dependency_queue::DependencyQueue;
 use crate::timings::TimingInfo;
 
@@ -9,8 +9,8 @@ use crate::timings::TimingInfo;
 pub struct Makespan(pub usize);
 
 /// Whenever Runner has a scheduling decision to make, it will consult it's hint provider.
-pub(super) trait HintProvider: std::fmt::Debug {
-    fn suggest_next<'a>(&self, items: &[&'a Artifact]) -> Option<&'a Artifact> {
+pub trait HintProvider: std::fmt::Debug {
+    fn suggest_next<'a>(&self, _: &[&'a Artifact]) -> Option<&'a Artifact> {
         None
     }
 }

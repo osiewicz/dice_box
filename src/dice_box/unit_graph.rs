@@ -1,7 +1,7 @@
 //! Parser for the unit-graph file.
 use serde::Deserialize;
 
-use crate::{artifact::Artifact, timings::node_type};
+use crate::{artifact::Artifact, timings::node_type, PackageId};
 
 /// 0-based index of Unit in `units` array of unit graph.
 type UnitIndex = usize;
@@ -13,7 +13,7 @@ pub(crate) struct Dependency {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Unit {
-    pkg_id: String,
+    pkg_id: PackageId,
     target: super::timings::Target,
     mode: super::timings::BuildMode,
     dependencies: Vec<Dependency>,

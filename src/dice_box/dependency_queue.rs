@@ -11,8 +11,7 @@
 //! some nodes may only require one of the outputs and can start before the
 //! whole node is finished.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::hash::Hash;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::artifact::Artifact;
 
