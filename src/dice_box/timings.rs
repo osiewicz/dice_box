@@ -69,9 +69,9 @@ pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
         if !line.starts_with('{') {
             continue;
         }
-        let timing: TimingInfo = serde_json::from_str(line).unwrap();
+        let mut timing: TimingInfo = serde_json::from_str(line).unwrap();
         let typ = timing.node_type();
-        /* if typ == ArtifactType::Metadata {
+        if typ == ArtifactType::Metadata {
             assert!(
                 timing.rmeta_time.is_some(),
                 "{:?}",
@@ -89,7 +89,7 @@ pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
             );
             // ... and for Metadata unit we're about to insert, just use rmeta_time
             timing.duration = timing.rmeta_time.take().unwrap();
-        }*/
+        }
         let _ = out.insert(
             Artifact {
                 package_id: timing.package_id.clone(),

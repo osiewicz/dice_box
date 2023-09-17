@@ -1,7 +1,11 @@
 //! Parser for the unit-graph file.
 use serde::Deserialize;
 
-use crate::{artifact::Artifact, timings::node_type, PackageId};
+use crate::{
+    artifact::{Artifact, ArtifactType},
+    timings::node_type,
+    PackageId,
+};
 
 /// 0-based index of Unit in `units` array of unit graph.
 type UnitIndex = usize;
@@ -38,8 +42,20 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
         let dependencies = unit
             .dependencies
             .iter()
-            .map(|dep| unit_to_artifact(&graph.units[dep.index]))
+            .map(|dep| {
+                let mut ret = unit_to_artifact(&graph.units[dep.index]);
+                ret
+            })
             .collect();
+        if artifact.typ == ArtifactType::Metadata {
+            ret.push(ArtifactUnit {
+                artifact: Artifact {
+                    typ: ArtifactType::Codegen,
+                    package_id: artifact.package_id.clone(),
+                },
+                dependencies: vec![artifact.clone()],
+            });
+        }
         ret.push(ArtifactUnit {
             artifact,
             dependencies,
