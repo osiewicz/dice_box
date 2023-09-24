@@ -14,6 +14,8 @@ which can then be passed into a Dice_box:
 
 It is also possible to control parallelism of a build with `-n` option; this affects the results of Dice_box, not it's speed of execution (which should generally be quick-enough). It simulates a build of a given crate with N threads, where N defaults to 10.
 
+## Acknowledgements
+The project contains significant parts of Rust's package manager (Cargo) with modifications, most notable one being a [DependencyQueue](https://github.com/rust-lang/cargo/blob/c031b0c69e2ca6202d6f13a04313841553ff42b9/src/cargo/util/dependency_queue.rs).
 ## License
 
 This project is licensed under either of
