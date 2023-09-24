@@ -17,3 +17,4 @@ path = "src/dice_box/lib.rs"
 serde = {version = "1.0", features = ["derive"]}
 clap = {version = "4.0", features = ["derive"]}
 serde_json = "1.0"
+itertools = "0.11"

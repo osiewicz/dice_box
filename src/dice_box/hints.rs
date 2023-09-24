@@ -1,14 +1,14 @@
 use crate::artifact::{Artifact, ArtifactType};
-
+pub(super) mod repeat_schedule;
 /// Whenever Runner has a scheduling decision to make, it will consult it's hint provider.
 pub trait HintProvider: std::fmt::Debug {
-    fn suggest_next<'a>(&self, timings: &[&'a Artifact]) -> Option<&'a Artifact>;
+    fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact>;
 }
 
 #[derive(Debug)]
 pub(super) struct ChooseTypeProvider(ArtifactType);
 impl HintProvider for ChooseTypeProvider {
-    fn suggest_next<'a>(&self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
+    fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
         timings.iter().find(|f| f.typ == self.0).cloned()
     }
 }
@@ -23,9 +23,9 @@ impl ChooseTypeProvider {
 pub(super) struct AggregateHintProvider(Vec<Box<dyn HintProvider>>);
 
 impl HintProvider for AggregateHintProvider {
-    fn suggest_next<'a>(&self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
+    fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
         self.0
-            .iter()
+            .iter_mut()
             .find_map(|provider| provider.suggest_next(timings))
     }
 }

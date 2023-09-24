@@ -63,8 +63,12 @@ impl Target {
     }
 }
 
-pub fn parse(contents: String, separate_codegen: bool) -> BTreeMap<Artifact, TimingInfo> {
+pub fn parse(
+    contents: String,
+    separate_codegen: bool,
+) -> (BTreeMap<Artifact, TimingInfo>, Vec<Artifact>) {
     let mut out = BTreeMap::new();
+    let mut order = vec![];
     for line in contents.lines() {
         if !line.starts_with('{') {
             continue;
@@ -90,6 +94,10 @@ pub fn parse(contents: String, separate_codegen: bool) -> BTreeMap<Artifact, Tim
             // ... and for Metadata unit we're about to insert, just use rmeta_time
             timing.duration = timing.rmeta_time.take().unwrap();
         }
+        order.push(Artifact {
+            package_id: timing.package_id.clone(),
+            typ,
+        });
         let _ = out.insert(
             Artifact {
                 package_id: timing.package_id.clone(),
@@ -97,7 +105,6 @@ pub fn parse(contents: String, separate_codegen: bool) -> BTreeMap<Artifact, Tim
             },
             timing,
         );
-        //assert!(current_entry.is_none(), "{current_entry:?} {typ:?}");
     }
-    out
+    (out, order)
 }

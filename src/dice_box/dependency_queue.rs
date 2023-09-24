@@ -99,11 +99,7 @@ impl DependencyQueue {
             .iter()
             .filter_map(|(artifact, deps)| deps.is_empty().then_some(artifact))
             .collect();
-        let key = self
-            .hints
-            .suggest_next(&candidates)
-            .or_else(|| candidates.into_iter().next())?
-            .clone();
+        let key = self.hints.suggest_next(&candidates)?.clone();
         let _ = self.dep_map.remove(&key).unwrap();
         Some(key)
     }
@@ -151,7 +147,7 @@ pub(super) struct CargoHints {
 }
 
 impl HintProvider for CargoHints {
-    fn suggest_next<'a>(&self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
+    fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
         timings
             .iter()
             .max_by_key(|artifact| self.priority[artifact])

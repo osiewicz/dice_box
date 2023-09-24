@@ -6,6 +6,7 @@ mod runner;
 mod timings;
 mod unit_graph;
 
+use artifact::Artifact;
 pub use cli::Cli;
 use dependency_queue::{DependencyQueue, DependencyQueueBuilder};
 pub use runner::Runner;
@@ -17,6 +18,7 @@ type PackageId = String;
 pub fn create_dependency_queue(
     graph: unit_graph::UnitGraph,
     separate_codegen: bool,
+    order: Vec<Artifact>,
 ) -> DependencyQueue {
     let mut ret = DependencyQueueBuilder::new();
     let artifact_units = unit_graph_to_artifacts(graph, separate_codegen);
