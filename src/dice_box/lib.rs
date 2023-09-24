@@ -18,7 +18,7 @@ type PackageId = String;
 pub fn create_dependency_queue(
     graph: unit_graph::UnitGraph,
     separate_codegen: bool,
-    order: Vec<Artifact>,
+    _order: Vec<Artifact>,
 ) -> DependencyQueue {
     let mut ret = DependencyQueueBuilder::new();
     let artifact_units = unit_graph_to_artifacts(graph, separate_codegen);

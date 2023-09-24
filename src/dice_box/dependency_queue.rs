@@ -32,6 +32,16 @@ pub(crate) struct DependencyQueueBuilder {
     reverse_dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
 }
 
+/// Analog of Cargo's DependencyQueue except of
+/// - being non-generic to make it a bit easier to experiment with - and not battle the trait bounds.
+/// - Excluding Job type - as we never actually execute builds.
+/// - Excluding `priority` and `cost` members, which are available as a HintProvider implementation in [CargoHints].
+/// This type also relies on this crate's HintProvider which makes scheduling decisions.
+/// Oh, an there's a [DependencyQueueBuilder] for it too, and for a reason; \
+/// some HintProviders might want to inspect the finished queue during it's initialization, which leads to circular dependency between
+/// a DependencyQueue and HintProvider implementation.
+/// We also use a BTreeMap instead of HashMap in this DependencyQueue to make the results of makespan simulation fully
+/// deterministic - we must not depend on the order of iteration here.
 pub struct DependencyQueue {
     /// A list of all known keys to build.
     ///
@@ -141,6 +151,8 @@ impl DependencyQueue {
     }
 }
 
+/// Scheduling implementation of Cargo as of 24.09.2023. It schedules dependencies based on potential parallelism
+/// once that crate is built (which corresponds directly with # of it's dependants).
 #[derive(Debug)]
 pub(super) struct CargoHints {
     priority: BTreeMap<Artifact, usize>,

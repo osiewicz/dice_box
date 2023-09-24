@@ -5,6 +5,7 @@ pub trait HintProvider: std::fmt::Debug {
     fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact>;
 }
 
+/// Simple HintProvider that prefers units of particular type.
 #[derive(Debug)]
 pub(super) struct ChooseTypeProvider(ArtifactType);
 impl HintProvider for ChooseTypeProvider {
@@ -19,6 +20,8 @@ impl ChooseTypeProvider {
     }
 }
 
+/// AggregateHintProvider queries several underlying HintProvider's, returning the
+/// query result of a first one that's successful.
 #[derive(Debug)]
 pub(super) struct AggregateHintProvider(Vec<Box<dyn HintProvider>>);
 
