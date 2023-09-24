@@ -42,19 +42,27 @@ pub(crate) fn unit_graph_to_artifacts(
     let mut ret = vec![];
     for unit in graph.units.iter() {
         let artifact = unit_to_artifact(&unit);
-        let dependencies = unit
+        let mut dependencies: Vec<_> = unit
             .dependencies
             .iter()
             .map(|dep| unit_to_artifact(&graph.units[dep.index]))
             .collect();
-        if separate_codegen && artifact.typ == ArtifactType::Metadata {
-            ret.push(ArtifactUnit {
-                artifact: Artifact {
-                    typ: ArtifactType::Codegen,
-                    package_id: artifact.package_id.clone(),
-                },
-                dependencies: vec![artifact.clone()],
-            });
+        if separate_codegen {
+            if artifact.typ == ArtifactType::Metadata {
+                ret.push(ArtifactUnit {
+                    artifact: Artifact {
+                        typ: ArtifactType::Codegen,
+                        package_id: artifact.package_id.clone(),
+                    },
+                    dependencies: vec![artifact.clone()],
+                });
+            } else if artifact.typ == ArtifactType::Link {
+                dependencies.iter_mut().for_each(|dep| {
+                    if dep.typ == ArtifactType::Metadata {
+                        dep.typ = ArtifactType::Codegen;
+                    }
+                })
+            }
         }
         ret.push(ArtifactUnit {
             artifact,
