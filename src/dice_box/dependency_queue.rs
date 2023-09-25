@@ -172,7 +172,11 @@ impl HintProvider for CargoHints {
             .iter()
             .max_by_key(|artifact| {
                 (
-                    self.separate_codegen && artifact.typ == ArtifactType::Codegen,
+                    // This is a customization point for separate-codegen implementation.
+                    // As is today, Codegen and Metadata are bundled into once rustc process,
+                    // which we emulate in scheduler by always scheduling codegen units straight away.
+                    // If separate codegen is enabled, we allow Codegen to be scheduled later on.
+                    self.separate_codegen || artifact.typ == ArtifactType::Codegen,
                     self.priority[artifact],
                 )
             })
@@ -194,10 +198,21 @@ impl CargoHints {
         for key in deps.dep_map.keys() {
             depth(key, &deps.reverse_dep_map, &mut out);
         }
+        fn dependent_cost(typ: ArtifactType) -> usize {
+            if typ == ArtifactType::Codegen {
+                0
+            } else {
+                10
+            }
+        }
         let priority = out
             .into_iter()
             .map(|(n, set)| {
-                let total_cost = 10 + set.iter().map(|_| 10).sum::<usize>();
+                let total_cost = dependent_cost(n.typ)
+                    + set
+                        .iter()
+                        .map(|dependent| dependent_cost(dependent.typ))
+                        .sum::<usize>();
                 (n, total_cost)
             })
             .collect();
