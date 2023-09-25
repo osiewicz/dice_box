@@ -4,6 +4,7 @@ use crate::artifact::Artifact;
 use crate::dependency_queue::DependencyQueue;
 use crate::timings::TimingInfo;
 
+use log::trace;
 use tabled::Tabled;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -65,8 +66,9 @@ impl Runner {
             // Clean out any tasks that end at the minimum quantum.
             if let Some(task) = maybe_task.as_ref() {
                 if task == &task_to_remove {
-                    let finished = maybe_task.take();
-                    self.queue.finish(&finished.unwrap().artifact);
+                    let finished = maybe_task.take().unwrap();
+                    trace!("Finished {:?}", &finished);
+                    self.queue.finish(&finished.artifact);
                 }
             }
             true
@@ -90,6 +92,7 @@ impl Runner {
                     .iter_mut()
                     .find(|slot| slot.is_none())
                     .expect("There should be at least one empty slot in the queue at this point, as we wouldn't be in the loop otherwise.");
+                trace!("Scheduling {:?}", &new_task);
                 *slot_for_task = Some(Task {
                     end_time: self.current_time + (self.timings[&new_task].duration * 1000.) as u64,
                     artifact: new_task,

@@ -3,6 +3,7 @@ use dice_box::{Cli, Runner};
 use tabled::Table;
 
 fn main() {
+    env_logger::init();
     let opts = Cli::parse();
 
     let timings_contents = std::fs::read_to_string(&opts.timings_file).unwrap();
