@@ -6,22 +6,31 @@ use crate::timings::TimingInfo;
 
 use tabled::Tabled;
 
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct Duration(std::time::Duration);
+
+impl std::fmt::Display for Duration {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "{:?}", self.0)
+    }
+}
+
 /// Makespan length, in seconds, of a given schedule.
 #[derive(Clone, Debug, PartialEq, PartialOrd, Tabled)]
 pub struct Makespan {
-  pub label: String,
-  pub num_threads: usize,
-  pub makespan: usize,
+    pub label: String,
+    pub num_threads: usize,
+    pub makespan: Duration,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 struct Task {
     artifact: Artifact,
-    end_time: usize,
+    end_time: u64,
 }
 
 pub struct Runner {
-    current_time: usize,
+    current_time: u64,
     queue: DependencyQueue,
     timings: BTreeMap<Artifact, TimingInfo>,
     running_tasks: Vec<Option<Task>>,
@@ -82,8 +91,7 @@ impl Runner {
                     .find(|slot| slot.is_none())
                     .expect("There should be at least one empty slot in the queue at this point, as we wouldn't be in the loop otherwise.");
                 *slot_for_task = Some(Task {
-                    end_time: self.current_time
-                        + (self.timings[&new_task].duration * 100.) as usize,
+                    end_time: self.current_time + (self.timings[&new_task].duration * 1000.) as u64,
                     artifact: new_task,
                 });
             } else {
@@ -103,7 +111,7 @@ impl Runner {
         Makespan {
             label: self.queue.hints().label(),
             num_threads: self.running_tasks.len(),
-            makespan: self.current_time
+            makespan: Duration(std::time::Duration::from_millis(self.current_time)),
         }
     }
 }
