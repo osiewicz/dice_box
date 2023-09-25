@@ -29,8 +29,15 @@ pub(crate) fn node_type(mode: &BuildMode, target: &Target) -> ArtifactType {
         (BuildMode::Build, true) => ArtifactType::BuildScriptBuild,
         (BuildMode::RunCustomBuild, true) => ArtifactType::BuildScriptRun,
         (BuildMode::Build, false)
-            if target.crate_types.contains(&CrateType::Bin)
-                || target.crate_types.contains(&CrateType::ProcMacro) =>
+            if target.crate_types.iter().any(|typ| {
+                [
+                    CrateType::Bin,
+                    CrateType::ProcMacro,
+                    CrateType::Rlib,
+                    CrateType::Cdylib,
+                ]
+                .contains(typ)
+            }) =>
         {
             ArtifactType::Link
         }
@@ -49,6 +56,8 @@ impl TimingInfo {
 enum CrateType {
     Lib,
     ProcMacro,
+    Rlib,
+    Cdylib,
     Bin,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
@@ -63,19 +72,16 @@ impl Target {
     }
 }
 
-pub fn parse(
-    contents: String,
-    separate_codegen: bool,
-) -> (BTreeMap<Artifact, TimingInfo>, Vec<Artifact>) {
+pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
     let mut out = BTreeMap::new();
-    let mut order = vec![];
     for line in contents.lines() {
         if !line.starts_with('{') {
             continue;
         }
         let mut timing: TimingInfo = serde_json::from_str(line).unwrap();
         let typ = timing.node_type();
-        if separate_codegen && typ == ArtifactType::Metadata {
+        if typ == ArtifactType::Metadata {
+            // Pipelining support
             assert!(
                 timing.rmeta_time.is_some(),
                 "{:?}",
@@ -94,10 +100,6 @@ pub fn parse(
             // ... and for Metadata unit we're about to insert, just use rmeta_time
             timing.duration = timing.rmeta_time.take().unwrap();
         }
-        order.push(Artifact {
-            package_id: timing.package_id.clone(),
-            typ,
-        });
         let _ = out.insert(
             Artifact {
                 package_id: timing.package_id.clone(),
@@ -106,5 +108,5 @@ pub fn parse(
             timing,
         );
     }
-    (out, order)
+    out
 }

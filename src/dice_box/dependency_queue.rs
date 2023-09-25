@@ -13,7 +13,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{artifact::Artifact, hints::HintProvider};
+use crate::{
+    artifact::{Artifact, ArtifactType},
+    hints::HintProvider,
+};
 
 #[derive(Debug)]
 pub(crate) struct DependencyQueueBuilder {
@@ -156,19 +159,28 @@ impl DependencyQueue {
 #[derive(Debug)]
 pub(super) struct CargoHints {
     priority: BTreeMap<Artifact, usize>,
+    separate_codegen: bool,
 }
 
 impl HintProvider for CargoHints {
     fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
         timings
             .iter()
-            .max_by_key(|artifact| self.priority[artifact])
+            .max_by_key(|artifact| {
+                (
+                    self.separate_codegen && artifact.typ == ArtifactType::Codegen,
+                    self.priority[artifact],
+                )
+            })
             .cloned()
     }
 }
 
 impl CargoHints {
-    pub(super) fn new(deps: &DependencyQueueBuilder) -> Box<dyn HintProvider> {
+    pub(super) fn new(
+        deps: &DependencyQueueBuilder,
+        separate_codegen: bool,
+    ) -> Box<dyn HintProvider> {
         let mut out = BTreeMap::new();
         for key in deps.dep_map.keys() {
             depth(key, &deps.reverse_dep_map, &mut out);
@@ -208,6 +220,9 @@ impl CargoHints {
             *slot = set;
             &*slot
         }
-        Box::new(Self { priority })
+        Box::new(Self {
+            priority,
+            separate_codegen,
+        })
     }
 }

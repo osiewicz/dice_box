@@ -28,10 +28,7 @@ pub(crate) struct ArtifactUnit {
     pub(crate) dependencies: Vec<Artifact>,
 }
 
-pub(crate) fn unit_graph_to_artifacts(
-    graph: UnitGraph,
-    separate_codegen: bool,
-) -> Vec<ArtifactUnit> {
+pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
     fn unit_to_artifact(unit: &Unit) -> Artifact {
         let typ = node_type(&unit.mode, &unit.target);
         Artifact {
@@ -47,23 +44,22 @@ pub(crate) fn unit_graph_to_artifacts(
             .iter()
             .map(|dep| unit_to_artifact(&graph.units[dep.index]))
             .collect();
-        if separate_codegen {
-            if artifact.typ == ArtifactType::Metadata {
-                ret.push(ArtifactUnit {
-                    artifact: Artifact {
-                        typ: ArtifactType::Codegen,
-                        package_id: artifact.package_id.clone(),
-                    },
-                    dependencies: vec![artifact.clone()],
-                });
-            } else if artifact.typ == ArtifactType::Link {
-                dependencies.iter_mut().for_each(|dep| {
-                    if dep.typ == ArtifactType::Metadata {
-                        dep.typ = ArtifactType::Codegen;
-                    }
-                })
-            }
+        if artifact.typ == ArtifactType::Metadata {
+            ret.push(ArtifactUnit {
+                artifact: Artifact {
+                    typ: ArtifactType::Codegen,
+                    package_id: artifact.package_id.clone(),
+                },
+                dependencies: vec![artifact.clone()],
+            });
+        } else if artifact.typ == ArtifactType::Link {
+            dependencies.iter_mut().for_each(|dep| {
+                if dep.typ == ArtifactType::Metadata {
+                    dep.typ = ArtifactType::Codegen;
+                }
+            })
         }
+
         ret.push(ArtifactUnit {
             artifact,
             dependencies,
