@@ -18,7 +18,7 @@ use crate::{
     hints::HintProvider,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DependencyQueueBuilder {
     /// A list of all known keys to build.
     ///
@@ -152,6 +152,10 @@ impl DependencyQueue {
         }
         result
     }
+
+    pub fn hints(&self) -> &dyn HintProvider {
+        &*self.hints
+    }
 }
 
 /// Scheduling implementation of Cargo as of 24.09.2023. It schedules dependencies based on potential parallelism
@@ -173,6 +177,14 @@ impl HintProvider for CargoHints {
                 )
             })
             .cloned()
+    }
+    fn label(&self) -> String {
+        let suffix = if self.separate_codegen {
+            " (separate codegen units)"
+        } else {
+            ""
+        };
+        format!("Cargo Hints{}", suffix)
     }
 }
 

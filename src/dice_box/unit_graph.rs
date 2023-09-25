@@ -10,12 +10,12 @@ use crate::{
 /// 0-based index of Unit in `units` array of unit graph.
 type UnitIndex = usize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct Dependency {
     index: UnitIndex,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub(crate) struct Unit {
     pkg_id: PackageId,
     target: super::timings::Target,
@@ -67,7 +67,7 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
     }
     ret
 }
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct UnitGraph {
     pub(crate) units: Vec<Unit>,
 }

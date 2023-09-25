@@ -4,9 +4,15 @@ use crate::artifact::Artifact;
 use crate::dependency_queue::DependencyQueue;
 use crate::timings::TimingInfo;
 
+use tabled::Tabled;
+
 /// Makespan length, in seconds, of a given schedule.
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct Makespan(pub usize);
+#[derive(Clone, Debug, PartialEq, PartialOrd, Tabled)]
+pub struct Makespan {
+  pub label: String,
+  pub num_threads: usize,
+  pub makespan: usize,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 struct Task {
@@ -94,6 +100,10 @@ impl Runner {
             self.step();
         }
         assert_eq!(self.busy_slots(), 0);
-        Makespan(self.current_time)
+        Makespan {
+            label: self.queue.hints().label(),
+            num_threads: self.running_tasks.len(),
+            makespan: self.current_time
+        }
     }
 }
