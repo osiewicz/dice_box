@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub(crate) struct DependencyQueueBuilder {
+pub struct DependencyQueueBuilder {
     /// A list of all known keys to build.
     ///
     /// The value of the hash map is list of dependencies which still need to be
@@ -157,7 +157,7 @@ impl DependencyQueue {
 /// Scheduling implementation of Cargo as of 24.09.2023. It schedules dependencies based on potential parallelism
 /// once that crate is built (which corresponds directly with # of it's dependants).
 #[derive(Debug)]
-pub(super) struct CargoHints {
+pub struct CargoHints {
     priority: BTreeMap<Artifact, usize>,
     separate_codegen: bool,
 }
@@ -177,10 +177,7 @@ impl HintProvider for CargoHints {
 }
 
 impl CargoHints {
-    pub(super) fn new(
-        deps: &DependencyQueueBuilder,
-        separate_codegen: bool,
-    ) -> Box<dyn HintProvider> {
+    pub fn new(deps: &DependencyQueueBuilder, separate_codegen: bool) -> Box<dyn HintProvider> {
         let mut out = BTreeMap::new();
         for key in deps.dep_map.keys() {
             depth(key, &deps.reverse_dep_map, &mut out);
