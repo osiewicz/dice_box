@@ -65,10 +65,13 @@ impl Runner {
         self.running_tasks.retain_mut(|maybe_task| {
             // Clean out any tasks that end at the minimum quantum.
             if let Some(task) = maybe_task.as_ref() {
-                if task == &task_to_remove {
+                if task.end_time == task_to_remove.end_time {
                     let finished = maybe_task.take().unwrap();
                     trace!("Finished {:?}", &finished);
-                    self.queue.finish(&finished.artifact);
+                    let unlocked_units = self.queue.finish(&finished.artifact);
+                    if !unlocked_units.is_empty() {
+                        trace!("Unlocked units: {:?}", unlocked_units);
+                    }
                 }
             }
             true
