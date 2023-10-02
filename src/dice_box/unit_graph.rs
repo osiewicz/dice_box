@@ -1,4 +1,6 @@
 //! Parser for the unit-graph file.
+use std::collections::HashSet;
+
 use serde::Deserialize;
 
 use crate::{
@@ -25,7 +27,7 @@ pub(crate) struct Unit {
 
 pub(crate) struct ArtifactUnit {
     pub(crate) artifact: Artifact,
-    pub(crate) dependencies: Vec<Artifact>,
+    pub(crate) dependencies: HashSet<Artifact>,
 }
 
 pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
@@ -50,9 +52,11 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
                     typ: ArtifactType::Codegen,
                     package_id: artifact.package_id.clone(),
                 },
-                dependencies: vec![artifact.clone()],
+                dependencies: HashSet::from_iter([artifact.clone()]),
             });
-        } else if artifact.typ == ArtifactType::Link {
+        } else if artifact.typ == ArtifactType::Link
+            || artifact.typ == ArtifactType::BuildScriptBuild
+        {
             dependencies.iter_mut().for_each(|dep| {
                 if dep.typ == ArtifactType::Metadata {
                     dep.typ = ArtifactType::Codegen;
@@ -62,7 +66,7 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
 
         ret.push(ArtifactUnit {
             artifact,
-            dependencies,
+            dependencies: HashSet::from_iter(dependencies),
         });
     }
     ret

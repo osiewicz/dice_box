@@ -21,3 +21,4 @@ itertools = "0.11"
 tabled = "0.14"
 log = "0.4"
 env_logger = "0.10"
+ordered-float = { version = "3.0", default-features = false }

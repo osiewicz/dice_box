@@ -9,6 +9,7 @@ mod unit_graph;
 pub use cli::Cli;
 pub use dependency_queue::CargoHints;
 use dependency_queue::DependencyQueueBuilder;
+pub use hints::NHintsProvider;
 pub use runner::Runner;
 pub use timings::parse;
 use unit_graph::unit_graph_to_artifacts;

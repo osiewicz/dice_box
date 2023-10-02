@@ -25,14 +25,14 @@ pub struct DependencyQueueBuilder {
     /// The value of the hash map is list of dependencies which still need to be
     /// built before the package can be built. Note that the set is dynamically
     /// updated as more dependencies are built.
-    dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
+    pub(super) dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
 
     /// A reverse mapping of a package to all packages that depend on that
     /// package.
     ///
     /// This map is statically known and does not get updated throughout the
     /// lifecycle of the DependencyQueue.
-    reverse_dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
+    pub(super) reverse_dep_map: BTreeMap<Artifact, BTreeSet<Artifact>>,
 }
 
 /// Analog of Cargo's DependencyQueue except of
@@ -192,6 +192,34 @@ impl HintProvider for CargoHints {
     }
 }
 
+/// Creates a flattened reverse dependency list. For a given key, finds the
+/// set of nodes which depend on it, including transitively. This is different
+/// from self.reverse_dep_map because self.reverse_dep_map only maps one level
+/// of reverse dependencies.
+pub(super) fn depth<'a>(
+    key: &Artifact,
+    map: &BTreeMap<Artifact, BTreeSet<Artifact>>,
+    results: &'a mut BTreeMap<Artifact, BTreeSet<Artifact>>,
+) -> &'a BTreeSet<Artifact> {
+    if results.contains_key(key) {
+        let depth = &results[key];
+        assert!(!depth.is_empty(), "cycle in DependencyQueue");
+        return depth;
+    }
+    results.insert(key.clone(), BTreeSet::new());
+
+    let mut set = BTreeSet::new();
+    set.insert(key.clone());
+
+    for dep in map.get(key).into_iter().flat_map(|it| it.iter()) {
+        set.extend(depth(dep, map, results).iter().cloned())
+    }
+
+    let slot = results.get_mut(key).unwrap();
+    *slot = set;
+    &*slot
+}
+
 impl CargoHints {
     pub fn new(deps: &DependencyQueueBuilder, separate_codegen: bool) -> Box<dyn HintProvider> {
         let mut out = BTreeMap::new();
@@ -217,33 +245,6 @@ impl CargoHints {
             })
             .collect();
 
-        /// Creates a flattened reverse dependency list. For a given key, finds the
-        /// set of nodes which depend on it, including transitively. This is different
-        /// from self.reverse_dep_map because self.reverse_dep_map only maps one level
-        /// of reverse dependencies.
-        fn depth<'a>(
-            key: &Artifact,
-            map: &BTreeMap<Artifact, BTreeSet<Artifact>>,
-            results: &'a mut BTreeMap<Artifact, BTreeSet<Artifact>>,
-        ) -> &'a BTreeSet<Artifact> {
-            if results.contains_key(key) {
-                let depth = &results[key];
-                assert!(!depth.is_empty(), "cycle in DependencyQueue");
-                return depth;
-            }
-            results.insert(key.clone(), BTreeSet::new());
-
-            let mut set = BTreeSet::new();
-            set.insert(key.clone());
-
-            for dep in map.get(key).into_iter().flat_map(|it| it.iter()) {
-                set.extend(depth(dep, map, results).iter().cloned())
-            }
-
-            let slot = results.get_mut(key).unwrap();
-            *slot = set;
-            &*slot
-        }
         Box::new(Self {
             priority,
             separate_codegen,
