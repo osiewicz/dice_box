@@ -52,13 +52,9 @@ impl NHintsProvider {
                 if let Some((my_last_dependency, my_first_dependant)) =
                     my_last_dependency.as_ref().zip(my_first_dependant.as_ref())
                 {
-                    assert!(
-                        my_last_dependency < my_first_dependant,
-                        "dependency: {}, dependant: {}, n_hints: {:?}",
-                        my_last_dependency,
-                        my_first_dependant,
-                        &n_hints
-                    );
+                    // This property should be upheld by the fact that our dependencies are also a transitive
+                    // dependencies of our dependants.
+                    assert!(my_last_dependency < my_first_dependant);
                 }
 
                 n_hints
