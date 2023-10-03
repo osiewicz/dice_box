@@ -34,14 +34,7 @@ impl NHintsProvider {
             .rev()
             .take(100)
             .collect();
-        let mut reverse_dependencies = BTreeMap::new();
-        for key in dependencies.dep_map.keys() {
-            super::dependency_queue::depth(
-                key,
-                &dependencies.reverse_dep_map,
-                &mut reverse_dependencies,
-            );
-        }
+        let reverse_dependencies = super::dependency_queue::reverse_dependencies(dependencies);
         let mut n_hints: Vec<Artifact> = vec![];
         for item in top_n_entries.into_iter() {
             let self_time = timings[&item].duration;

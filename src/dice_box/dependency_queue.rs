@@ -196,7 +196,7 @@ impl HintProvider for CargoHints {
 /// set of nodes which depend on it, including transitively. This is different
 /// from self.reverse_dep_map because self.reverse_dep_map only maps one level
 /// of reverse dependencies.
-pub(super) fn depth<'a>(
+fn depth<'a>(
     key: &Artifact,
     map: &BTreeMap<Artifact, BTreeSet<Artifact>>,
     results: &'a mut BTreeMap<Artifact, BTreeSet<Artifact>>,
@@ -220,12 +220,19 @@ pub(super) fn depth<'a>(
     &*slot
 }
 
+pub(super) fn reverse_dependencies(
+    deps: &DependencyQueueBuilder,
+) -> BTreeMap<Artifact, BTreeSet<Artifact>> {
+    let mut out = BTreeMap::new();
+    for key in deps.dep_map.keys() {
+        depth(key, &deps.reverse_dep_map, &mut out);
+    }
+    out
+}
+
 impl CargoHints {
     pub fn new(deps: &DependencyQueueBuilder, separate_codegen: bool) -> Box<dyn HintProvider> {
-        let mut out = BTreeMap::new();
-        for key in deps.dep_map.keys() {
-            depth(key, &deps.reverse_dep_map, &mut out);
-        }
+        let out = reverse_dependencies(&deps);
         fn dependent_cost(typ: ArtifactType) -> usize {
             if typ == ArtifactType::Codegen {
                 0
