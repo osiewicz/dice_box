@@ -39,30 +39,36 @@ impl NHintsProvider {
         for item in top_n_entries.into_iter() {
             let self_time = timings[&item].duration;
             let my_dependants = &reverse_dependencies[&item];
-            let mut candidate_index = None;
             let insertion_index: usize = (|| {
-                for (index, entry) in n_hints.iter().enumerate() {
-                    if my_dependants.contains(&entry) {
-                        // We've encountered our dependency, so we must push it to the right
-                        // and take it's slot.
-                        return index;
-                    }
-                    if reverse_dependencies[&entry].contains(&item) {
-                        // Something that we depend on is okay, we just must ensure that we're
-                        // built after it.
-                        continue;
-                    }
-                    let time = timings[&entry].duration;
-                    if time < self_time {
-                        if index != n_hints.len() - 1 {
-                            assert!(n_hints[index + 1..]
-                                .iter()
-                                .all(|entry| !my_dependants.contains(entry)));
-                        }
-                        candidate_index = Some(index);
-                    }
+                if n_hints.is_empty() {
+                    return 0;
                 }
-                return candidate_index.unwrap_or(n_hints.len());
+                let my_last_dependency = n_hints
+                    .iter()
+                    .rposition(|entry| reverse_dependencies[&entry].contains(&item));
+                let my_first_dependant = n_hints
+                    .iter()
+                    .position(|entry| my_dependants.contains(entry));
+                if let Some((my_last_dependency, my_first_dependant)) =
+                    my_last_dependency.as_ref().zip(my_first_dependant.as_ref())
+                {
+                    assert!(
+                        my_last_dependency < my_first_dependant,
+                        "dependency: {}, dependant: {}, n_hints: {:?}",
+                        my_last_dependency,
+                        my_first_dependant,
+                        &n_hints
+                    );
+                }
+
+                n_hints
+                    [my_last_dependency.unwrap_or(0)..my_first_dependant.unwrap_or(n_hints.len())]
+                    .iter()
+                    .position(|entry| {
+                        let time = timings[&entry].duration;
+                        time < self_time
+                    })
+                    .unwrap_or(my_first_dependant.unwrap_or(n_hints.len()))
             })();
             n_hints.insert(insertion_index, item);
         }
