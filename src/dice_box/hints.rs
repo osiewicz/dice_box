@@ -34,7 +34,6 @@ impl NHintsProvider {
             .rev()
             .take(100)
             .collect();
-        // dbg!(&top_n_entries);
         let mut reverse_dependencies = BTreeMap::new();
         for key in dependencies.dep_map.keys() {
             super::dependency_queue::depth(
@@ -97,21 +96,13 @@ impl HintProvider for NHintsProvider {
             .filter_map(|artifact| {
                 let dependencies_of = &self.reverse_dependencies[&artifact];
                 assert_ne!(dependencies_of.len(), 0);
-                if dependencies_of.len() == 1 {
-                    //dbg!(&artifact, &dependencies_of);
-                }
+
                 self.n_hints
                     .iter()
                     .position(|a| dependencies_of.contains(a))
             })
             .min()
         else {
-            dbg!(&self.n_hints);
-
-            for t in timings {
-                dbg!(t, &self.reverse_dependencies[&t]);
-            }
-            panic!("Ay!!!");
             return self.inner.suggest_next(&timings);
         };
         let candidates = timings
