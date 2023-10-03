@@ -39,6 +39,7 @@ impl NHintsProvider {
         for item in top_n_entries.into_iter() {
             let self_time = timings[&item].duration;
             let my_dependants = &reverse_dependencies[&item];
+            let mut candidate_index = None;
             let insertion_index: usize = (|| {
                 for (index, entry) in n_hints.iter().enumerate() {
                     if my_dependants.contains(&entry) {
@@ -58,14 +59,15 @@ impl NHintsProvider {
                                 .iter()
                                 .all(|entry| !my_dependants.contains(entry)));
                         }
-                        return index;
+                        candidate_index = Some(index);
                     }
                 }
-                return n_hints.len();
+                return candidate_index.unwrap_or(n_hints.len());
             })();
             n_hints.insert(insertion_index, item);
         }
         let inner = CargoHints::new(dependencies, separate_codegen);
+        dbg!(&n_hints);
         Box::new(Self {
             n_hints,
             inner,
@@ -88,11 +90,11 @@ impl HintProvider for NHintsProvider {
             .iter()
             .filter_map(|artifact| {
                 let dependencies_of = &self.reverse_dependencies[&artifact];
-                assert_ne!(dependencies_of.len(), 0);
+                //assert_ne!(dependencies_of.len(), 0, "{:?}", artifact);
 
                 self.n_hints
                     .iter()
-                    .position(|a| dependencies_of.contains(a))
+                    .position(|a| &a == artifact || dependencies_of.contains(a))
             })
             .min()
         else {
@@ -104,7 +106,7 @@ impl HintProvider for NHintsProvider {
                 let dependencies_of = &self.reverse_dependencies[&f];
                 self.n_hints
                     .iter()
-                    .position(|a| dependencies_of.contains(a))
+                    .position(|a| &&a == f || dependencies_of.contains(a))
                     == Some(min_position)
             })
             .cloned()

@@ -227,6 +227,9 @@ pub(super) fn reverse_dependencies(
     for key in deps.dep_map.keys() {
         depth(key, &deps.reverse_dep_map, &mut out);
     }
+    for (key, value) in &mut out {
+        assert!(value.remove(key));
+    }
     out
 }
 
@@ -256,5 +259,47 @@ impl CargoHints {
             priority,
             separate_codegen,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn reverse_deps_are_transitive() {
+        // Tests if reverse_dependencies function returns a map that contains all reverse dependencies, including
+        // transitive ones.
+        let mut builder = DependencyQueueBuilder::new();
+        let packages = vec![
+            Artifact {
+                package_id: "A".into(),
+                typ: ArtifactType::Metadata,
+            },
+            Artifact {
+                package_id: "A".into(),
+                typ: ArtifactType::Codegen,
+            },
+            Artifact {
+                package_id: "B".into(),
+                typ: ArtifactType::BuildScriptBuild,
+            },
+            Artifact {
+                package_id: "B".into(),
+                typ: ArtifactType::BuildScriptRun,
+            },
+        ];
+        let deps = vec![vec![], vec![0], vec![1], vec![2]];
+        for (index, package) in packages.iter().enumerate() {
+            builder.queue(
+                package.clone(),
+                deps[index].iter().map(|index| packages[*index].clone()),
+            );
+        }
+        let reverse_dependencies = reverse_dependencies(&builder);
+        let a_deps = &reverse_dependencies[&packages[0]];
+        assert_eq!(a_deps.len(), 3);
+        assert!(a_deps.contains(&packages[1]));
+        assert!(a_deps.contains(&packages[2]));
+        assert!(a_deps.contains(&packages[3]));
     }
 }
