@@ -27,7 +27,18 @@ impl NHintsProvider {
         separate_codegen: bool,
     ) -> Box<dyn HintProvider> {
         let mut top_n_entries = timings.iter().map(|(a, b)| (b, a)).collect::<Vec<_>>();
-        top_n_entries.sort_by_key(|entry| ordered_float::OrderedFloat(entry.0.duration));
+        top_n_entries.sort_by_key(|entry| {
+            let mut self_duration = ordered_float::OrderedFloat(entry.0.duration);
+            if separate_codegen && entry.1.typ == ArtifactType::Metadata {
+                if let Some(codegen_timing) = timings.get(&Artifact {
+                    typ: ArtifactType::Codegen,
+                    package_id: entry.1.package_id.clone(),
+                }) {
+                    self_duration += ordered_float::OrderedFloat(codegen_timing.duration);
+                }
+            }
+            self_duration
+        });
         let top_n_entries: Vec<Artifact> = top_n_entries
             .into_iter()
             .map(|(_, artifact)| artifact.clone())
@@ -54,16 +65,30 @@ impl NHintsProvider {
                 {
                     // This property should be upheld by the fact that our dependencies are also a transitive
                     // dependencies of our dependants.
-                    assert!(my_last_dependency < my_first_dependant);
+                    assert!(
+                        my_last_dependency < my_first_dependant,
+                        "{} {} {:?}\n\n{:?}\n\n{:?}",
+                        my_last_dependency,
+                        my_first_dependant,
+                        item,
+                        n_hints,
+                        my_dependants
+                    );
                 }
 
-                n_hints
-                    [my_last_dependency.unwrap_or(0)..my_first_dependant.unwrap_or(n_hints.len())]
+                if my_last_dependency.map(|i| i + 1) == my_first_dependant {
+                    if let Some(my_first_dependant) = my_first_dependant {
+                        return my_first_dependant;
+                    }
+                }
+                n_hints[my_last_dependency.map(|i| i + 1).unwrap_or(0)
+                    ..my_first_dependant.unwrap_or(n_hints.len())]
                     .iter()
                     .position(|entry| {
                         let time = timings[&entry].duration;
                         time < self_time
                     })
+                    .map(|res| res + my_last_dependency.map(|i| i + 1).unwrap_or_default())
                     .unwrap_or(my_first_dependant.unwrap_or(n_hints.len()))
             })();
             n_hints.insert(insertion_index, item);
