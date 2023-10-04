@@ -26,19 +26,22 @@ impl NHintsProvider {
         timings: &BTreeMap<Artifact, TimingInfo>,
         separate_codegen: bool,
     ) -> Box<dyn HintProvider> {
-        let mut top_n_entries = timings.iter().map(|(a, b)| (b, a)).collect::<Vec<_>>();
-        top_n_entries.sort_by_key(|entry| {
-            let mut self_duration = ordered_float::OrderedFloat(entry.0.duration);
-            if separate_codegen && entry.1.typ == ArtifactType::Metadata {
-                if let Some(codegen_timing) = timings.get(&Artifact {
-                    typ: ArtifactType::Codegen,
-                    package_id: entry.1.package_id.clone(),
-                }) {
-                    self_duration += ordered_float::OrderedFloat(codegen_timing.duration);
+        let old_timings = timings;
+        let mut timings = timings.clone();
+        if !separate_codegen {
+            for entry in timings.iter_mut() {
+                if entry.0.typ == ArtifactType::Metadata {
+                    if let Some(codegen_timing) = old_timings.get(&Artifact {
+                        typ: ArtifactType::Codegen,
+                        package_id: entry.0.package_id.clone(),
+                    }) {
+                        entry.1.duration += codegen_timing.duration;
+                    }
                 }
             }
-            self_duration
-        });
+        }
+        let mut top_n_entries = timings.iter().map(|(a, b)| (b, a)).collect::<Vec<_>>();
+        top_n_entries.sort_by_key(|entry| ordered_float::OrderedFloat(entry.0.duration));
         let top_n_entries: Vec<Artifact> = top_n_entries
             .into_iter()
             .map(|(_, artifact)| artifact.clone())
@@ -113,7 +116,7 @@ impl HintProvider for NHintsProvider {
                 return Some(t);
             }
         }
-        let Some(min_position) = timings
+        let Some((_, min_position)) = timings
             .iter()
             .filter_map(|artifact| {
                 let dependencies_of = &self.reverse_dependencies[&artifact];
@@ -122,9 +125,15 @@ impl HintProvider for NHintsProvider {
                 self.n_hints
                     .iter()
                     .position(|a| &a == artifact || dependencies_of.contains(a))
+                    .map(|position| (&&self.n_hints[position] != artifact, position))
             })
             .min()
         else {
+            dbg!(timings);
+            dbg!(timings
+                .iter()
+                .map(|t| &self.reverse_dependencies[&t])
+                .collect::<Vec<_>>());
             return self.inner.suggest_next(&timings);
         };
         let candidates = timings
