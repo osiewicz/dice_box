@@ -97,7 +97,6 @@ impl NHintsProvider {
             n_hints.insert(insertion_index, item);
         }
         let inner = CargoHints::new(dependencies, separate_codegen);
-        dbg!(&n_hints);
         Box::new(Self {
             n_hints,
             inner,
@@ -129,11 +128,6 @@ impl HintProvider for NHintsProvider {
             })
             .min()
         else {
-            dbg!(timings);
-            dbg!(timings
-                .iter()
-                .map(|t| &self.reverse_dependencies[&t])
-                .collect::<Vec<_>>());
             return self.inner.suggest_next(&timings);
         };
         let candidates = timings
