@@ -73,12 +73,9 @@ impl Target {
 }
 
 pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
+    let timings: Vec<TimingInfo> = serde_json::from_str(&contents).unwrap();
     let mut out = BTreeMap::new();
-    for line in contents.lines() {
-        if !line.starts_with('{') {
-            continue;
-        }
-        let mut timing: TimingInfo = serde_json::from_str(line).unwrap();
+    for mut timing in timings {
         let typ = timing.node_type();
         if typ == ArtifactType::Metadata {
             // Pipelining support

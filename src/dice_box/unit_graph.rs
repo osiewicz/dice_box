@@ -1,5 +1,5 @@
 //! Parser for the unit-graph file.
-use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use serde::Deserialize;
 
@@ -27,7 +27,7 @@ pub(crate) struct Unit {
 
 pub(crate) struct ArtifactUnit {
     pub(crate) artifact: Artifact,
-    pub(crate) dependencies: HashSet<Artifact>,
+    pub(crate) dependencies: BTreeSet<Artifact>,
 }
 
 pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
@@ -38,7 +38,7 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
             package_id: unit.pkg_id.clone(),
         }
     }
-    let mut ret = vec![];
+    let mut ret = BTreeMap::new();
     for unit in graph.units.iter() {
         let artifact = unit_to_artifact(&unit);
         let mut dependencies: Vec<_> = unit
@@ -46,14 +46,15 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
             .iter()
             .map(|dep| unit_to_artifact(&graph.units[dep.index]))
             .collect();
+        assert!(!dependencies.contains(&artifact));
         if artifact.typ == ArtifactType::Metadata {
-            ret.push(ArtifactUnit {
-                artifact: Artifact {
+            ret.insert(
+                Artifact {
                     typ: ArtifactType::Codegen,
                     package_id: artifact.package_id.clone(),
                 },
-                dependencies: HashSet::from_iter([artifact.clone()]),
-            });
+                BTreeSet::from_iter([artifact.clone()]),
+            );
         } else if artifact.typ == ArtifactType::Link
             || artifact.typ == ArtifactType::BuildScriptBuild
         {
@@ -61,15 +62,44 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
                 if dep.typ == ArtifactType::Metadata {
                     dep.typ = ArtifactType::Codegen;
                 }
-            })
+            });
         }
-
-        ret.push(ArtifactUnit {
-            artifact,
-            dependencies: HashSet::from_iter(dependencies),
-        });
+        ret.insert(artifact, BTreeSet::from_iter(dependencies));
     }
-    ret
+    fn depend_on_deps_of_deps(
+        deps: &mut BTreeMap<Artifact, BTreeSet<Artifact>>,
+        parent: &Artifact,
+        child: &Artifact,
+    ) {
+        for dep in deps.get(child).cloned().unwrap() {
+            if dep.typ == ArtifactType::Metadata {
+                let should_recurse = deps.get_mut(parent).unwrap().insert(Artifact {
+                    typ: ArtifactType::Codegen,
+                    ..dep.clone()
+                });
+                if should_recurse {
+                    depend_on_deps_of_deps(deps, &parent, &dep);
+                }
+            }
+        }
+    }
+    let nodes: Vec<(Artifact, _)> = ret
+        .iter()
+        .filter(|(k, _)| k.typ == ArtifactType::Link)
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    for (parent, deps) in nodes {
+        for dep in deps {
+            assert_ne!(dep, parent);
+            depend_on_deps_of_deps(&mut ret, &parent, &dep);
+        }
+    }
+    ret.into_iter()
+        .map(|(artifact, dependencies)| ArtifactUnit {
+            artifact,
+            dependencies,
+        })
+        .collect()
 }
 #[derive(Clone, Debug, Deserialize)]
 pub struct UnitGraph {

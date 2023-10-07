@@ -18,6 +18,7 @@ pub struct NHintsProvider {
     inner: Box<dyn HintProvider>,
     reverse_dependencies: BTreeMap<Artifact, BTreeSet<Artifact>>,
     separate_codegen: bool,
+    timings: BTreeMap<Artifact, TimingInfo>,
 }
 
 impl NHintsProvider {
@@ -102,6 +103,7 @@ impl NHintsProvider {
             inner,
             reverse_dependencies,
             separate_codegen,
+            timings: timings.clone(),
         })
     }
 }
@@ -115,7 +117,7 @@ impl HintProvider for NHintsProvider {
                 return Some(t);
             }
         }
-        let Some((_, min_position)) = timings
+        let Some((_, min_position, _)) = timings
             .iter()
             .filter_map(|artifact| {
                 let dependencies_of = &self.reverse_dependencies[&artifact];
@@ -124,10 +126,19 @@ impl HintProvider for NHintsProvider {
                 self.n_hints
                     .iter()
                     .position(|a| &a == artifact || dependencies_of.contains(a))
-                    .map(|position| (&&self.n_hints[position] != artifact, position))
+                    .map(|position| {
+                        (
+                            &&self.n_hints[position] != artifact,
+                            position,
+                            ordered_float::OrderedFloat(
+                                -self.timings.get(artifact).unwrap().duration,
+                            ),
+                        )
+                    })
             })
             .min()
         else {
+            unreachable!("{:?}", timings);
             return self.inner.suggest_next(&timings);
         };
         let candidates = timings

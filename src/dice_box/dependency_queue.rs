@@ -83,6 +83,7 @@ impl DependencyQueueBuilder {
 
         let mut my_dependencies = BTreeSet::new();
         for dep in dependencies {
+            assert_ne!(&dep, &key);
             my_dependencies.insert(dep.clone());
             self.reverse_dep_map
                 .entry(dep)
@@ -112,6 +113,14 @@ impl DependencyQueue {
             .iter()
             .filter_map(|(artifact, deps)| deps.is_empty().then_some(artifact))
             .collect();
+        if candidates.is_empty() {
+            let a = self
+                .dep_map
+                .iter()
+                .filter(|(artifact, _)| artifact.package_id.contains("live_kit_client"))
+                .collect::<Vec<_>>();
+            panic!("{a:?} {}", a.len());
+        }
         let key = self.hints.suggest_next(&candidates)?.clone();
         let _ = self.dep_map.remove(&key).unwrap();
         Some(key)
