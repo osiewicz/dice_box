@@ -53,7 +53,7 @@ impl TimingInfo {
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
 #[serde(rename_all = "kebab-case")]
-enum CrateType {
+pub(super) enum CrateType {
     Lib,
     ProcMacro,
     Rlib,
@@ -62,8 +62,8 @@ enum CrateType {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub(crate) struct Target {
-    name: String,
-    crate_types: Vec<CrateType>,
+    pub(super) name: String,
+    pub(super) crate_types: Vec<CrateType>,
 }
 
 impl Target {

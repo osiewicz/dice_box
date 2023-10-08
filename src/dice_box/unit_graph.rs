@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::{
     artifact::{Artifact, ArtifactType},
-    timings::node_type,
+    timings::{node_type, BuildMode, CrateType, Target},
     PackageId,
 };
 
@@ -13,18 +13,26 @@ use crate::{
 type UnitIndex = usize;
 
 #[derive(Clone, Debug, Deserialize)]
+/// Represents a Dependency within a particular unit graph.
 pub(crate) struct Dependency {
     index: UnitIndex,
+}
+
+impl Dependency {
+    pub(crate) fn new(index: UnitIndex) -> Self {
+        Self { index }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct Unit {
     pkg_id: PackageId,
-    target: super::timings::Target,
-    mode: super::timings::BuildMode,
+    target: Target,
+    mode: BuildMode,
     dependencies: Vec<Dependency>,
 }
 
+#[derive(Debug, PartialEq)]
 pub(crate) struct ArtifactUnit {
     pub(crate) artifact: Artifact,
     pub(crate) dependencies: BTreeSet<Artifact>,
@@ -104,4 +112,121 @@ pub(crate) fn unit_graph_to_artifacts(graph: UnitGraph) -> Vec<ArtifactUnit> {
 #[derive(Clone, Debug, Deserialize)]
 pub struct UnitGraph {
     pub(crate) units: Vec<Unit>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::timings::CrateType;
+    #[test]
+    fn single_crate_build() {
+        let unit_graph = UnitGraph {
+            units: vec![
+                Unit {
+                    pkg_id: "target".into(),
+                    target: Target {
+                        name: "target".into(),
+                        crate_types: vec![CrateType::Lib],
+                    },
+                    mode: BuildMode::Build,
+                    dependencies: vec![],
+                },
+                Unit {
+                    pkg_id: "target".into(),
+                    target: Target {
+                        name: "target".into(),
+                        crate_types: vec![CrateType::Bin],
+                    },
+                    mode: BuildMode::Build,
+                    dependencies: vec![Dependency::new(0)],
+                },
+            ],
+        };
+        let units = super::unit_graph_to_artifacts(unit_graph);
+        let with_typ = |typ, deps: &[_]| ArtifactUnit {
+            artifact: Artifact {
+                typ,
+                package_id: "target".into(),
+            },
+            dependencies: BTreeSet::from_iter(deps.iter().cloned().map(|typ| Artifact {
+                typ,
+                package_id: "target".into(),
+            })),
+        };
+        assert_eq!(
+            units,
+            vec![
+                with_typ(ArtifactType::Metadata, &[]),
+                with_typ(ArtifactType::Codegen, &[ArtifactType::Metadata]),
+                with_typ(ArtifactType::Link, &[ArtifactType::Codegen])
+            ]
+        );
+    }
+    #[test]
+    fn single_crate_with_build_script() {
+        let unit_graph = UnitGraph {
+            units: vec![
+                Unit {
+                    pkg_id: "target".into(),
+                    target: Target {
+                        name: "build-script-build".into(),
+                        crate_types: vec![CrateType::Lib],
+                    },
+                    mode: BuildMode::Build,
+                    dependencies: vec![],
+                },
+                Unit {
+                    pkg_id: "target".into(),
+                    target: Target {
+                        name: "build-script-build".into(),
+                        crate_types: vec![CrateType::Bin],
+                    },
+                    mode: BuildMode::RunCustomBuild,
+                    dependencies: vec![Dependency::new(0)],
+                },
+                Unit {
+                    pkg_id: "target".into(),
+                    target: Target {
+                        name: "target".into(),
+                        crate_types: vec![CrateType::Lib],
+                    },
+                    mode: BuildMode::Build,
+                    dependencies: vec![Dependency::new(1)],
+                },
+                Unit {
+                    pkg_id: "target".into(),
+                    target: Target {
+                        name: "target".into(),
+                        crate_types: vec![CrateType::Bin],
+                    },
+                    mode: BuildMode::Build,
+                    dependencies: vec![Dependency::new(2)],
+                },
+            ],
+        };
+        let units = super::unit_graph_to_artifacts(unit_graph);
+        let with_typ = |typ, deps: &[_]| ArtifactUnit {
+            artifact: Artifact {
+                typ,
+                package_id: "target".into(),
+            },
+            dependencies: BTreeSet::from_iter(deps.iter().cloned().map(|typ| Artifact {
+                typ,
+                package_id: "target".into(),
+            })),
+        };
+        assert_eq!(
+            units,
+            vec![
+                with_typ(ArtifactType::BuildScriptBuild, &[]),
+                with_typ(
+                    ArtifactType::BuildScriptRun,
+                    &[ArtifactType::BuildScriptBuild]
+                ),
+                with_typ(ArtifactType::Metadata, &[ArtifactType::BuildScriptRun]),
+                with_typ(ArtifactType::Codegen, &[ArtifactType::Metadata]),
+                with_typ(ArtifactType::Link, &[ArtifactType::Codegen])
+            ]
+        );
+    }
 }
