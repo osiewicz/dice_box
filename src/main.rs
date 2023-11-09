@@ -26,7 +26,7 @@ fn main() {
     let mut scenarios = [
         dice_box::Runner::new(dep_graph, timings.clone(), opts.num_threads),
         dice_box::Runner::new(dep_graph_n, timings.clone(), opts.num_threads),
-        dice_box::Runner::new(optimal_dep_graph, timings, u16::MAX as usize)
+        dice_box::Runner::new(optimal_dep_graph, timings, u8::MAX as usize)
             .with_label("Optimal build schedule (current Cargo algo)".into()),
     ];
     let results = Table::new(scenarios.iter_mut().map(Runner::calculate)).to_string();
