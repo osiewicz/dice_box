@@ -15,8 +15,8 @@ fn main() {
         let hints = dice_box::CargoHints::new(&dependency_queue, true);
         dependency_queue.clone().finish(hints)
     };
-    let dep_graph_n = {
-        let hints = dice_box::NHintsProvider::new(&dependency_queue, &timings, true);
+    let mut dep_graph_n = {
+        let hints = dice_box::NHintsProvider::new(&dependency_queue, &timings, false);
         dependency_queue.clone().finish(hints)
     };
     let dep_graph = {
@@ -25,12 +25,12 @@ fn main() {
     };
 
     let mut scenarios = [
-        // dice_box::Runner::new(dep_graph, timings.clone(), opts.num_threads),
-        // dice_box::Runner::new(
-        //     dep_graph_separate_codegen,
-        //     timings.clone(),
-        //     opts.num_threads,
-        // ),
+        dice_box::Runner::new(dep_graph, timings.clone(), opts.num_threads),
+        dice_box::Runner::new(
+            dep_graph_separate_codegen,
+            timings.clone(),
+            opts.num_threads,
+        ),
         dice_box::Runner::new(dep_graph_n, timings, opts.num_threads),
     ];
     let results = Table::new(scenarios.iter_mut().map(Runner::calculate)).to_string();
