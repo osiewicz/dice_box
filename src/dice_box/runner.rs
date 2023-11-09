@@ -35,6 +35,7 @@ pub struct Runner {
     queue: DependencyQueue,
     timings: BTreeMap<Artifact, TimingInfo>,
     running_tasks: Vec<Option<Task>>,
+    label: String,
 }
 
 impl Runner {
@@ -45,12 +46,17 @@ impl Runner {
     ) -> Self {
         Self {
             running_tasks: vec![None; num_threads],
+            label: queue.hints().label(),
             queue,
             timings,
             current_time: 0,
         }
     }
 
+    pub fn with_label(mut self, label: String) -> Self {
+        self.label = label;
+        self
+    }
     fn run_next_task_to_completion(&mut self) {
         let Some(task_to_remove) = self
             .running_tasks

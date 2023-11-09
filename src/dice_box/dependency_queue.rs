@@ -112,9 +112,18 @@ impl DependencyQueue {
             .iter()
             .filter_map(|(artifact, deps)| deps.is_empty().then_some(artifact))
             .collect();
-        let key = self.hints.suggest_next(&candidates)?.clone();
+
+        let key: Artifact = if let Some(codegen_unit) = candidates
+            .iter()
+            .find(|candidate| candidate.typ == ArtifactType::Codegen)
+            .cloned()
+        {
+            codegen_unit.clone()
+        } else {
+            self.hints.suggest_next(&candidates)?.clone()
+        };
         let _ = self.dep_map.remove(&key).unwrap();
-        Some(key)
+        Some(key.clone())
     }
 
     /// Returns `true` if there are remaining packages to be built.
@@ -163,32 +172,17 @@ impl DependencyQueue {
 #[derive(Debug)]
 pub struct CargoHints {
     priority: BTreeMap<Artifact, usize>,
-    separate_codegen: bool,
 }
 
 impl HintProvider for CargoHints {
     fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
         timings
             .iter()
-            .max_by_key(|artifact| {
-                (
-                    // This is a customization point for separate-codegen implementation.
-                    // As is today, Codegen and Metadata are bundled into once rustc process,
-                    // which we emulate in scheduler by always scheduling codegen units straight away.
-                    // If separate codegen is enabled, we allow Codegen to be scheduled later on.
-                    self.separate_codegen || artifact.typ == ArtifactType::Codegen,
-                    self.priority[artifact],
-                )
-            })
+            .max_by_key(|artifact| self.priority[artifact])
             .cloned()
     }
     fn label(&self) -> String {
-        let suffix = if self.separate_codegen {
-            " (separate codegen units)"
-        } else {
-            ""
-        };
-        format!("Cargo Hints{}", suffix)
+        "Cargo Hints".into()
     }
 }
 
@@ -234,7 +228,7 @@ pub(super) fn reverse_dependencies(
 }
 
 impl CargoHints {
-    pub fn new(deps: &DependencyQueueBuilder, separate_codegen: bool) -> Box<dyn HintProvider> {
+    pub fn new(deps: &DependencyQueueBuilder) -> Box<dyn HintProvider> {
         let out = reverse_dependencies(&deps);
         fn dependent_cost(typ: ArtifactType) -> usize {
             if typ == ArtifactType::Codegen {
@@ -255,10 +249,7 @@ impl CargoHints {
             })
             .collect();
 
-        Box::new(Self {
-            priority,
-            separate_codegen,
-        })
+        Box::new(Self { priority })
     }
 }
 

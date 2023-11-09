@@ -17,29 +17,26 @@ pub struct NHintsProvider {
     n_hints: Vec<Artifact>,
     inner: Box<dyn HintProvider>,
     reverse_dependencies: BTreeMap<Artifact, BTreeSet<Artifact>>,
-    separate_codegen: bool,
 }
 
 impl NHintsProvider {
     pub fn new(
         dependencies: &DependencyQueueBuilder,
         timings: &BTreeMap<Artifact, TimingInfo>,
-        separate_codegen: bool,
     ) -> Box<dyn HintProvider> {
         let old_timings = timings;
         let mut timings = timings.clone();
-        if !separate_codegen {
-            for entry in timings.iter_mut() {
-                if entry.0.typ == ArtifactType::Metadata {
-                    if let Some(codegen_timing) = old_timings.get(&Artifact {
-                        typ: ArtifactType::Codegen,
-                        package_id: entry.0.package_id.clone(),
-                    }) {
-                        entry.1.duration += codegen_timing.duration;
-                    }
+        for entry in timings.iter_mut() {
+            if entry.0.typ == ArtifactType::Metadata {
+                if let Some(codegen_timing) = old_timings.get(&Artifact {
+                    typ: ArtifactType::Codegen,
+                    package_id: entry.0.package_id.clone(),
+                }) {
+                    entry.1.duration += codegen_timing.duration;
                 }
             }
         }
+
         let mut top_n_entries = timings.iter().map(|(a, b)| (b, a)).collect::<Vec<_>>();
         top_n_entries.sort_by_key(|entry| ordered_float::OrderedFloat(entry.0.duration));
         let top_n_entries: Vec<Artifact> = top_n_entries
@@ -96,25 +93,23 @@ impl NHintsProvider {
             })();
             n_hints.insert(insertion_index, item);
         }
-        let inner = CargoHints::new(dependencies, separate_codegen);
+        let inner = CargoHints::new(dependencies);
         Box::new(Self {
             n_hints,
             inner,
             reverse_dependencies,
-            separate_codegen,
         })
     }
 }
 impl HintProvider for NHintsProvider {
     fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
-        if !self.separate_codegen {
-            if let Some(t) = timings
-                .iter()
-                .find(|item| item.typ == ArtifactType::Codegen)
-            {
-                return Some(t);
-            }
+        if let Some(t) = timings
+            .iter()
+            .find(|item| item.typ == ArtifactType::Codegen)
+        {
+            return Some(t);
         }
+
         let Some((_, min_position)) = timings
             .iter()
             .filter_map(|artifact| {
