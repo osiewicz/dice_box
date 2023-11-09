@@ -103,13 +103,6 @@ impl NHintsProvider {
 }
 impl HintProvider for NHintsProvider {
     fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
-        if let Some(t) = timings
-            .iter()
-            .find(|item| item.typ == ArtifactType::Codegen)
-        {
-            return Some(t);
-        }
-
         let Some((_, min_position)) = timings
             .iter()
             .filter_map(|artifact| {
