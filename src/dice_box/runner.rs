@@ -68,7 +68,7 @@ impl Runner {
             // No task is running.
             return;
         };
-        let Some(task_to_remove) = self.running_tasks[..last_active_task + 1]
+        let Some(task_to_remove) = self.running_tasks[..=last_active_task]
             .iter()
             .cloned()
             .filter_map(|key| key)
@@ -77,7 +77,7 @@ impl Runner {
             return;
         };
 
-        self.running_tasks[..last_active_task + 1]
+        self.running_tasks[..=last_active_task]
             .iter_mut()
             .for_each(|maybe_task| {
                 // Clean out any tasks that end at the minimum quantum.
