@@ -35,6 +35,7 @@ pub struct Runner {
     queue: DependencyQueue,
     timings: BTreeMap<Artifact, TimingInfo>,
     running_tasks: Vec<Option<Task>>,
+    running_tasks_count: usize,
     label: String,
 }
 
@@ -50,6 +51,7 @@ impl Runner {
             queue,
             timings,
             current_time: 0,
+            running_tasks_count: 0,
         }
     }
 
@@ -72,6 +74,7 @@ impl Runner {
             // Clean out any tasks that end at the minimum quantum.
             if let Some(task) = maybe_task.as_ref() {
                 if task.end_time == task_to_remove.end_time {
+                    self.running_tasks_count -= 1;
                     let finished = maybe_task.take().unwrap();
                     trace!("Finished {:?}", &finished);
                     let unlocked_units = self.queue.finish(&finished.artifact);
@@ -85,13 +88,10 @@ impl Runner {
         self.current_time = task_to_remove.end_time;
     }
     fn free_slots(&self) -> usize {
-        self.running_tasks
-            .iter()
-            .filter(|task| task.is_none())
-            .count()
+        self.running_tasks.len() - self.busy_slots()
     }
     fn busy_slots(&self) -> usize {
-        self.running_tasks.len() - self.free_slots()
+        self.running_tasks_count
     }
     fn schedule_new_tasks(&mut self) {
         while self.free_slots() > 0 {
@@ -106,6 +106,7 @@ impl Runner {
                     end_time: self.current_time + (self.timings[&new_task].duration * 1000.) as u64,
                     artifact: new_task,
                 });
+                self.running_tasks_count += 1;
             } else {
                 break;
             }
