@@ -232,6 +232,8 @@ impl CargoHints {
         let out = reverse_dependencies(&deps);
         fn dependent_cost(typ: ArtifactType) -> usize {
             if typ == ArtifactType::Codegen {
+                // Codegen nodes are artificial and they don't really exist in the original Cargo scheduler, so we make their presence in the graph
+                // a non-factor. Their dependencies are still acounted for though.
                 0
             } else {
                 10
