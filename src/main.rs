@@ -24,10 +24,10 @@ fn main() {
         dependency_queue.finish(hints)
     };
     let mut scenarios = [
-        // dice_box::Runner::new(dep_graph, timings.clone(), opts.num_threads),
-        // dice_box::Runner::new(dep_graph_n, timings.clone(), opts.num_threads),
-        dice_box::Runner::new(optimal_dep_graph, timings, 65536 * 128)
-            .with_label("Optimal build schedule".into()),
+        dice_box::Runner::new(dep_graph, timings.clone(), opts.num_threads),
+        dice_box::Runner::new(dep_graph_n, timings.clone(), opts.num_threads),
+        dice_box::Runner::new(optimal_dep_graph, timings, u16::MAX as usize)
+            .with_label("Optimal build schedule (current Cargo algo)".into()),
     ];
     let results = Table::new(scenarios.iter_mut().map(Runner::calculate)).to_string();
     println!("{}", results);

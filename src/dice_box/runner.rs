@@ -60,31 +60,39 @@ impl Runner {
         self
     }
     fn run_next_task_to_completion(&mut self) {
-        let Some(task_to_remove) = self
-            .running_tasks
+        let mut counter = 0;
+        let Some(last_active_task) = self.running_tasks.iter().position(|item| {
+            counter += item.is_some() as usize;
+            counter == self.running_tasks_count
+        }) else {
+            // No task is running.
+            return;
+        };
+        let Some(task_to_remove) = self.running_tasks[..last_active_task + 1]
             .iter()
-            .filter(|f| f.is_some())
-            .min_by_key(|task| task.as_ref().and_then(|t| Some(t.end_time)))
             .cloned()
-            .flatten()
+            .filter_map(|key| key)
+            .min_by_key(|task| task.end_time)
         else {
             return;
         };
-        self.running_tasks.retain_mut(|maybe_task| {
-            // Clean out any tasks that end at the minimum quantum.
-            if let Some(task) = maybe_task.as_ref() {
-                if task.end_time == task_to_remove.end_time {
-                    self.running_tasks_count -= 1;
-                    let finished = maybe_task.take().unwrap();
-                    trace!("Finished {:?}", &finished);
-                    let unlocked_units = self.queue.finish(&finished.artifact);
-                    if !unlocked_units.is_empty() {
-                        trace!("Unlocked units: {:?}", unlocked_units);
+
+        self.running_tasks[..last_active_task + 1]
+            .iter_mut()
+            .for_each(|maybe_task| {
+                // Clean out any tasks that end at the minimum quantum.
+                if let Some(task) = maybe_task.as_ref() {
+                    if task.end_time == task_to_remove.end_time {
+                        self.running_tasks_count -= 1;
+                        let finished = maybe_task.take().unwrap();
+                        trace!("Finished {:?}", &finished);
+                        let unlocked_units = self.queue.finish(&finished.artifact);
+                        if !unlocked_units.is_empty() {
+                            trace!("Unlocked units: {:?}", unlocked_units);
+                        }
                     }
                 }
-            }
-            true
-        });
+            });
         self.current_time = task_to_remove.end_time;
     }
     fn free_slots(&self) -> usize {
@@ -122,7 +130,7 @@ impl Runner {
         }
         assert_eq!(self.busy_slots(), 0);
         Makespan {
-            label: self.queue.hints().label(),
+            label: self.label.clone(),
             num_threads: self.running_tasks.len(),
             makespan: Duration(std::time::Duration::from_millis(self.current_time)),
         }
