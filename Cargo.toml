@@ -14,6 +14,7 @@ name = "dice_box"
 path = "src/dice_box/lib.rs"
 
 [dependencies]
+anyhow = "1.0"
 serde = {version = "1.0", features = ["derive"]}
 clap = {version = "4.0", features = ["derive"]}
 serde_json = "1.0"
@@ -22,3 +23,4 @@ tabled = "0.14"
 log = "0.4"
 env_logger = "0.10"
 ordered-float = { version = "3.0", default-features = false }
+humantime = "2.1.0"

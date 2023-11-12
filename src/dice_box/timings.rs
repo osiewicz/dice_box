@@ -1,4 +1,5 @@
 //! Parser for the timings file.
+mod visualization;
 
 use std::collections::BTreeMap;
 
@@ -8,13 +9,14 @@ use crate::{
     artifact::{Artifact, ArtifactType},
     PackageId,
 };
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Hash, Serialize, Deserialize, PartialEq, PartialOrd, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum BuildMode {
     RunCustomBuild,
     Build,
 }
 
+// Parsed output of --timings=json
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct TimingInfo {
     mode: BuildMode,
@@ -24,6 +26,13 @@ pub struct TimingInfo {
     target: Target,
 }
 
+/// Input to cargo-timings-esque file generation.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
+pub struct TimingInstant {
+    start: f64,
+    #[serde(flatten)]
+    info: TimingInfo,
+}
 pub(crate) fn node_type(mode: &BuildMode, target: &Target) -> ArtifactType {
     match (mode, target.is_build_script()) {
         (BuildMode::Build, true) => ArtifactType::BuildScriptBuild,
@@ -51,7 +60,7 @@ impl TimingInfo {
         node_type(&self.mode, &self.target)
     }
 }
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Hash, Deserialize, Serialize, PartialEq, PartialOrd, Eq)]
 #[serde(rename_all = "kebab-case")]
 enum CrateType {
     Lib,
@@ -60,7 +69,7 @@ enum CrateType {
     Cdylib,
     Bin,
 }
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, PartialOrd, Eq)]
 pub(crate) struct Target {
     name: String,
     crate_types: Vec<CrateType>,
@@ -72,6 +81,7 @@ impl Target {
     }
 }
 
+/// Deserialize timings from contents of a timings.json file.
 pub fn parse(contents: String) -> BTreeMap<Artifact, TimingInfo> {
     let mut out = BTreeMap::new();
     for line in contents.lines() {
