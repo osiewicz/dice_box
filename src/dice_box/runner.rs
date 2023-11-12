@@ -95,20 +95,12 @@ impl Runner {
             });
         self.current_time = task_to_remove.end_time;
     }
-    fn free_slots(&self) -> usize {
-        self.running_tasks.len() - self.busy_slots()
-    }
     fn busy_slots(&self) -> usize {
         self.running_tasks_count
     }
     fn schedule_new_tasks(&mut self) {
-        while self.free_slots() > 0 {
+        while let Some(slot_for_task) = self.running_tasks.iter_mut().find(|slot| slot.is_none()) {
             if let Some(new_task) = self.queue.dequeue() {
-                let slot_for_task = self
-                    .running_tasks
-                    .iter_mut()
-                    .find(|slot| slot.is_none())
-                    .expect("There should be at least one empty slot in the queue at this point, as we wouldn't be in the loop otherwise.");
                 trace!("Scheduling {:?}", &new_task);
                 *slot_for_task = Some(Task {
                     end_time: self.current_time + (self.timings[&new_task].duration * 1000.) as u64,
