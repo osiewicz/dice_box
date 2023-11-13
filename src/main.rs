@@ -29,6 +29,13 @@ fn main() {
         dice_box::Runner::new(optimal_dep_graph, timings, u8::MAX as usize)
             .with_label("Optimal build schedule (current Cargo algo)".into()),
     ];
-    let results = Table::new(scenarios.iter_mut().map(Runner::calculate)).to_string();
+    let (results, timings): (Vec<_>, Vec<_>) = scenarios
+        .iter_mut()
+        .map(|runner| runner.calculate())
+        .unzip();
+    let results = Table::new(results).to_string();
     println!("{}", results);
+    timings.into_iter().enumerate().for_each(|(index, timing)| {
+        timing.report_html(index.to_string()).ok();
+    });
 }

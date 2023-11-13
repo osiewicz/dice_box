@@ -1,5 +1,6 @@
 //! Parser for the timings file.
 mod visualization;
+pub use visualization::{Timings, UnitTime};
 
 use std::collections::BTreeMap;
 

@@ -12,6 +12,7 @@ use dependency_queue::DependencyQueueBuilder;
 pub use hints::NHintsProvider;
 pub use runner::Runner;
 pub use timings::parse;
+pub use timings::Timings;
 use unit_graph::unit_graph_to_artifacts;
 pub use unit_graph::UnitGraph;
 type PackageId = String;

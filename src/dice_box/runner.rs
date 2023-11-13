@@ -1,14 +1,16 @@
 use std::collections::BTreeMap;
 
-use crate::artifact::Artifact;
+use crate::artifact::{Artifact, ArtifactType};
 use crate::dependency_queue::DependencyQueue;
-use crate::timings::TimingInfo;
+use crate::timings::{TimingInfo, Timings};
 
 use log::trace;
 use tabled::Tabled;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Duration(std::time::Duration);
+
+pub type StartTime = u64;
 
 impl std::fmt::Display for Duration {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -37,6 +39,7 @@ pub struct Runner {
     running_tasks: Vec<Option<Task>>,
     running_tasks_count: usize,
     label: String,
+    order: Vec<(StartTime, Artifact)>,
 }
 
 impl Runner {
@@ -52,6 +55,7 @@ impl Runner {
             timings,
             current_time: 0,
             running_tasks_count: 0,
+            order: Default::default(),
         }
     }
 
@@ -102,6 +106,10 @@ impl Runner {
         while let Some(slot_for_task) = self.running_tasks.iter_mut().find(|slot| slot.is_none()) {
             if let Some(new_task) = self.queue.dequeue() {
                 trace!("Scheduling {:?}", &new_task);
+                if new_task.typ != ArtifactType::Codegen {
+                    self.order.push((self.current_time, new_task.clone()));
+                }
+
                 *slot_for_task = Some(Task {
                     end_time: self.current_time + (self.timings[&new_task].duration * 1000.) as u64,
                     artifact: new_task,
@@ -116,15 +124,19 @@ impl Runner {
         self.run_next_task_to_completion();
         self.schedule_new_tasks();
     }
-    pub fn calculate(&mut self) -> Makespan {
+    pub fn calculate(&mut self) -> (Makespan, Timings) {
         while !self.queue.is_empty() || self.busy_slots() > 0 {
             self.step();
         }
         assert_eq!(self.busy_slots(), 0);
-        Makespan {
-            label: self.label.clone(),
-            num_threads: self.running_tasks.len(),
-            makespan: Duration(std::time::Duration::from_millis(self.current_time)),
-        }
+        let timings = Timings::new(&self.order, &self.timings);
+        (
+            Makespan {
+                label: self.label.clone(),
+                num_threads: self.running_tasks.len(),
+                makespan: Duration(std::time::Duration::from_millis(self.current_time)),
+            },
+            timings,
+        )
     }
 }

@@ -2,11 +2,12 @@
 //!
 //! This module implements visualization of simulated build process. Large parts of it are pulled verbatim from cargo. Notably I've stripped tracking of units unlocked by finished rmeta/codegen.
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::{BufWriter, Write};
-use std::thread::available_parallelism;
 use std::time::SystemTime;
 
+use crate::artifact::Artifact;
+use crate::runner::StartTime;
 use crate::timings::BuildMode;
 use crate::unit_graph::Unit;
 
@@ -60,23 +61,41 @@ struct Concurrency {
 }
 
 impl Timings {
-    pub fn new(unit_times: Vec<UnitTime>) -> Timings {
+    pub fn new(
+        order: &[(StartTime, Artifact)],
+        timings: &BTreeMap<Artifact, super::TimingInfo>,
+    ) -> Timings {
         let start_str = humantime::format_rfc3339_seconds(SystemTime::now()).to_string();
+        type StartedUnits = u64;
+        type EndedUnits = u64;
+        let mut unique_times = BTreeMap::<u64, (StartedUnits, EndedUnits)>::new();
+        for (start_time, item) in order.iter() {
+            unique_times.entry(*start_time).or_default().0 += 1;
+            let end_time = start_time + (timings.get(item).unwrap().duration * 1000.) as u64;
+            unique_times.entry(end_time).or_default().1 += 1;
+        }
 
+        //let concurrency =
         Timings {
             start_str,
             unit_times: Vec::new(),
-            concurrency: Vec::new(),
+            concurrency: vec![Concurrency {
+                t: 0.1,
+                active: 3,
+                waiting: 0,
+                inactive: 2,
+            }],
             cpu_usage: Vec::new(),
         }
     }
 
     /// Save HTML report to disk.
-    fn report_html(&self, timings_suffix: String) -> Result<()> {
+    pub fn report_html(&self, timings_suffix: String) -> Result<()> {
         let timestamp = self.start_str.replace(&['-', ':'][..], "");
 
-        let filename = format!("cargo-timing-{}-{}.html", timings_suffix, timestamp);
-        let mut f = BufWriter::new(std::fs::File::open(&filename)?);
+        let filename = format!("./cargo-timing-{}-{}.html", timings_suffix, timestamp);
+        let file = std::fs::File::create(&filename)?;
+        let mut f = BufWriter::new(file);
         f.write_all(HTML_TMPL.as_bytes())?;
         self.write_summary_table(&mut f, 0.)?;
         f.write_all(HTML_CANVAS.as_bytes())?;
