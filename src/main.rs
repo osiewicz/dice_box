@@ -35,7 +35,14 @@ fn main() {
         .unzip();
     let results = Table::new(results).to_string();
     println!("{}", results);
-    timings.into_iter().enumerate().for_each(|(index, timing)| {
-        // timing.report_html(index.to_string()).ok();
-    });
+    if opts.timings {
+        let all_but_optimal = timings.len() - 1;
+        timings
+            .into_iter()
+            .take(all_but_optimal)
+            .enumerate()
+            .for_each(|(index, timing)| {
+                timing.report_html(index.to_string()).ok();
+            });
+    }
 }

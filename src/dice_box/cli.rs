@@ -14,4 +14,8 @@ pub struct Cli {
     /// Number of threads in simulated build environment.
     #[clap(short, long, default_value_t = 10)]
     pub num_threads: usize,
+
+    /// Whether to output timings for builds.
+    #[clap(short, long)]
+    pub timings: bool,
 }
