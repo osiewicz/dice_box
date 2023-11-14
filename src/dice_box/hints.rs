@@ -17,6 +17,7 @@ pub struct NHintsProvider {
     n_hints: Vec<Artifact>,
     inner: Box<dyn HintProvider>,
     reverse_dependencies: BTreeMap<Artifact, BTreeSet<Artifact>>,
+    timings: BTreeMap<Artifact, TimingInfo>,
 }
 
 impl NHintsProvider {
@@ -113,6 +114,7 @@ impl NHintsProvider {
         }
         let inner = CargoHints::new(dependencies);
         Box::new(Self {
+            timings,
             n_hints,
             inner,
             reverse_dependencies,
@@ -126,23 +128,38 @@ impl HintProvider for NHintsProvider {
             // as it was most likely just added to the candidate queue.
             return Some(codegen);
         }
-        let (key, _) = timings
+        let direct_hit = timings
             .iter()
             .filter_map(|artifact| {
-                let dependencies_of = &self.reverse_dependencies[&artifact];
-                //assert_ne!(dependencies_of.len(), 0, "{:?}", artifact);
-                let mut is_direct_hit = false;
-                let position = self
-                    .n_hints
+                self.n_hints
                     .iter()
-                    .position(|a| {
-                        is_direct_hit = &a == artifact;
-                        is_direct_hit || dependencies_of.contains(a)
-                    })
-                    .unwrap_or(self.n_hints.len());
-                Some((artifact.clone(), (!is_direct_hit, position)))
+                    .find(|a| a == artifact)
+                    .map(|_| artifact)
             })
-            .min_by_key(|(_, priority)| *priority)?;
+            .max_by_key(|artifact| {
+                self.timings
+                    .get(artifact)
+                    .map(|timing| ordered_float::OrderedFloat(timing.duration))
+                    .unwrap_or_default()
+            })
+            .cloned();
+        let key = direct_hit.map(|d| dbg!(d)).or_else(|| {
+            timings
+                .iter()
+                .filter_map(|artifact| {
+                    let dependencies_of = &self.reverse_dependencies[&artifact];
+
+                    let position = self
+                        .n_hints
+                        .iter()
+                        .position(|a| dependencies_of.contains(a))
+                        .unwrap_or(self.n_hints.len());
+                    Some((artifact, position))
+                })
+                .min_by_key(|(_, priority)| *priority)
+                .map(|a| a.0)
+                .cloned()
+        })?;
         Some(key)
     }
 
