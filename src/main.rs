@@ -36,6 +36,6 @@ fn main() {
     let results = Table::new(results).to_string();
     println!("{}", results);
     timings.into_iter().enumerate().for_each(|(index, timing)| {
-        timing.report_html(index.to_string()).ok();
+        // timing.report_html(index.to_string()).ok();
     });
 }

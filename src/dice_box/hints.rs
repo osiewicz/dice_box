@@ -37,14 +37,32 @@ impl NHintsProvider {
             }
         }
 
+        timings.retain(|k, v| {
+            if k.typ == ArtifactType::Metadata {
+                if let Some(codegen_timing) = old_timings.get(&Artifact {
+                    typ: ArtifactType::Codegen,
+                    package_id: k.package_id.clone(),
+                }) {
+                    v.duration += codegen_timing.duration;
+                }
+            }
+            k.typ != ArtifactType::Codegen
+        });
         let mut top_n_entries = timings.iter().map(|(a, b)| (b, a)).collect::<Vec<_>>();
         top_n_entries.sort_by_key(|entry| ordered_float::OrderedFloat(entry.0.duration));
-        let top_n_entries: Vec<Artifact> = top_n_entries
+        let mut top_n_entries: Vec<Artifact> = top_n_entries
             .into_iter()
             .map(|(_, artifact)| artifact.clone())
             .rev()
-            .take(100)
+            .take(75)
             .collect();
+        top_n_entries.sort_by_cached_key(|n| {
+            dependencies
+                .reverse_dep_map
+                .get(n)
+                .map(|d| d.len())
+                .unwrap_or_default()
+        });
         let reverse_dependencies = super::dependency_queue::reverse_dependencies(dependencies);
         let mut n_hints: Vec<Artifact> = vec![];
         for item in top_n_entries.into_iter() {
@@ -103,33 +121,29 @@ impl NHintsProvider {
 }
 impl HintProvider for NHintsProvider {
     fn suggest_next<'a>(&mut self, timings: &[&'a Artifact]) -> Option<&'a Artifact> {
-        let Some((_, min_position)) = timings
+        if let Some(codegen) = timings.iter().find(|t| t.typ == ArtifactType::Codegen) {
+            // Simulate how pipelining works right now. If there's some codegen task just pick it,
+            // as it was most likely just added to the candidate queue.
+            return Some(codegen);
+        }
+        let (key, _) = timings
             .iter()
             .filter_map(|artifact| {
                 let dependencies_of = &self.reverse_dependencies[&artifact];
                 //assert_ne!(dependencies_of.len(), 0, "{:?}", artifact);
-
-                self.n_hints
+                let mut is_direct_hit = false;
+                let position = self
+                    .n_hints
                     .iter()
-                    .position(|a| &a == artifact || dependencies_of.contains(a))
-                    .map(|position| (&&self.n_hints[position] != artifact, position))
+                    .position(|a| {
+                        is_direct_hit = &a == artifact;
+                        is_direct_hit || dependencies_of.contains(a)
+                    })
+                    .unwrap_or(self.n_hints.len());
+                Some((artifact.clone(), (!is_direct_hit, position)))
             })
-            .min()
-        else {
-            return self.inner.suggest_next(&timings);
-        };
-        let candidates = timings
-            .iter()
-            .filter(|f| {
-                let dependencies_of = &self.reverse_dependencies[&f];
-                self.n_hints
-                    .iter()
-                    .position(|a| &&a == f || dependencies_of.contains(a))
-                    == Some(min_position)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        self.inner.suggest_next(&candidates)
+            .min_by_key(|(_, priority)| *priority)?;
+        Some(key)
     }
 
     fn label(&self) -> String {
