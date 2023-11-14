@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::{BufWriter, Write};
 use std::time::SystemTime;
 
-use crate::artifact::Artifact;
+use crate::artifact::{Artifact, ArtifactType};
 use crate::runner::StartTime;
 use crate::timings::BuildMode;
 use crate::unit_graph::Unit;
@@ -30,6 +30,7 @@ pub struct Timings {
     /// recording was taken and second element is percentage usage of the
     /// system.
     cpu_usage: Vec<(f64, f64)>,
+    total_time: f64,
 }
 
 /// Tracking information for an individual unit.
@@ -64,28 +65,74 @@ impl Timings {
     pub fn new(
         order: &[(StartTime, Artifact)],
         timings: &BTreeMap<Artifact, super::TimingInfo>,
+        cores: usize,
+        total_time: u64,
     ) -> Timings {
         let start_str = humantime::format_rfc3339_seconds(SystemTime::now()).to_string();
-        type StartedUnits = u64;
-        type EndedUnits = u64;
+        let total_time = total_time as f64 / 1000.;
+        type StartedUnits = usize;
+        type EndedUnits = usize;
         let mut unique_times = BTreeMap::<u64, (StartedUnits, EndedUnits)>::new();
         for (start_time, item) in order.iter() {
             unique_times.entry(*start_time).or_default().0 += 1;
             let end_time = start_time + (timings.get(item).unwrap().duration * 1000.) as u64;
             unique_times.entry(end_time).or_default().1 += 1;
         }
+        let mut unit_times: Vec<UnitTime> = vec![];
+        for (start_time, item) in order.into_iter() {
+            let info = timings.get(item).unwrap();
+            let codegen_info = (item.typ == ArtifactType::Metadata)
+                .then(|| {
+                    timings.get(&Artifact {
+                        typ: crate::artifact::ArtifactType::Codegen,
+                        ..item.clone()
+                    })
+                })
+                .flatten();
+            let rmeta_time = codegen_info
+                .map(|_| info.duration)
+                .or_else(|| info.rmeta_time);
+            let duration = codegen_info
+                .map(|codegen| codegen.duration)
+                .unwrap_or_default()
+                + info.duration;
+            unit_times.push(UnitTime {
+                unit: Unit {
+                    pkg_id: info.package_id.clone(),
+                    target: info.target.clone(),
+                    mode: info.mode.clone(),
+                    dependencies: vec![],
+                },
+                target: info.target.name.to_owned(),
+                start: *start_time as f64 / 1000.,
+                duration,
+                rmeta_time,
+            })
+        }
+        let mut concurrency = vec![];
+        let mut cpu_usage = vec![];
+        let mut active_units = 0;
+        for (time, (started, ended)) in unique_times {
+            active_units += started;
+            active_units -= ended;
+            concurrency.push(Concurrency {
+                t: time as f64 / 1000.,
+                active: active_units,
+                waiting: 0,
+                inactive: 0,
+            });
+            cpu_usage.push((
+                time as f64 / 1000.,
+                active_units as f64 / cores as f64 * 100.,
+            ))
+        }
 
-        //let concurrency =
         Timings {
             start_str,
-            unit_times: Vec::new(),
-            concurrency: vec![Concurrency {
-                t: 0.1,
-                active: 3,
-                waiting: 0,
-                inactive: 2,
-            }],
-            cpu_usage: Vec::new(),
+            unit_times,
+            concurrency,
+            cpu_usage,
+            total_time,
         }
     }
 
@@ -97,14 +144,14 @@ impl Timings {
         let file = std::fs::File::create(&filename)?;
         let mut f = BufWriter::new(file);
         f.write_all(HTML_TMPL.as_bytes())?;
-        self.write_summary_table(&mut f, 0.)?;
+        self.write_summary_table(&mut f, self.total_time)?;
         f.write_all(HTML_CANVAS.as_bytes())?;
         // It helps with pixel alignment to use whole numbers.
         writeln!(
             f,
             "<script>\n\
              DURATION = {};",
-            f64::ceil(0.) as u32
+            f64::ceil(self.total_time) as u32
         )?;
         self.write_js_data(&mut f)?;
         write!(
@@ -149,12 +196,6 @@ impl Timings {
     /// in a `<script>` HTML element to draw graphs.
     fn write_js_data(&self, f: &mut impl Write) -> Result<()> {
         // Create a map to link indices of unlocked units.
-        let unit_map: HashMap<Unit, usize> = self
-            .unit_times
-            .iter()
-            .enumerate()
-            .map(|(i, ut)| (ut.unit.clone(), i))
-            .collect();
         #[derive(serde::Serialize)]
         struct UnitData {
             i: usize,
@@ -164,6 +205,8 @@ impl Timings {
             start: f64,
             duration: f64,
             rmeta_time: Option<f64>,
+            unlocked_units: Vec<usize>,
+            unlocked_rmeta_units: Vec<usize>,
         }
         let round = |x: f64| (x * 100.0).round() / 100.0;
         let unit_data: Vec<UnitData> = self
@@ -177,15 +220,23 @@ impl Timings {
                     "todo"
                 }
                 .to_string();
+                let suffix_start = ut
+                    .unit
+                    .pkg_id
+                    .bytes()
+                    .position(|character| character == '(' as u8)
+                    .unwrap_or(ut.unit.pkg_id.len());
 
                 UnitData {
                     i,
-                    name: ut.unit.pkg_id.clone(),
+                    name: ut.unit.pkg_id[..suffix_start].to_owned(),
                     mode,
-                    target: ut.target.clone(),
+                    target: "".to_owned(),
                     start: round(ut.start),
                     duration: round(ut.duration),
                     rmeta_time: ut.rmeta_time.map(round),
+                    unlocked_units: vec![],
+                    unlocked_rmeta_units: vec![],
                 }
             })
             .collect();

@@ -129,7 +129,12 @@ impl Runner {
             self.step();
         }
         assert_eq!(self.busy_slots(), 0);
-        let timings = Timings::new(&self.order, &self.timings);
+        let timings = Timings::new(
+            &self.order,
+            &self.timings,
+            self.running_tasks.len(),
+            self.current_time,
+        );
         (
             Makespan {
                 label: self.label.clone(),

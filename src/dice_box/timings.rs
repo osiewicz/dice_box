@@ -12,7 +12,7 @@ use crate::{
 };
 #[derive(Clone, Copy, Debug, Hash, Serialize, Deserialize, PartialEq, PartialOrd, Eq)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum BuildMode {
+pub enum BuildMode {
     RunCustomBuild,
     Build,
 }
@@ -20,11 +20,11 @@ pub(crate) enum BuildMode {
 // Parsed output of --timings=json
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 pub struct TimingInfo {
-    mode: BuildMode,
+    pub mode: BuildMode,
     pub duration: f64,
-    rmeta_time: Option<f64>,
-    package_id: PackageId,
-    target: Target,
+    pub rmeta_time: Option<f64>,
+    pub package_id: PackageId,
+    pub target: Target,
 }
 
 /// Input to cargo-timings-esque file generation.
@@ -71,8 +71,8 @@ enum CrateType {
     Bin,
 }
 #[derive(Clone, Debug, Hash, Serialize, Deserialize, PartialEq, PartialOrd, Eq)]
-pub(crate) struct Target {
-    name: String,
+pub struct Target {
+    pub name: String,
     crate_types: Vec<CrateType>,
 }
 
