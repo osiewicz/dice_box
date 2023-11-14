@@ -1,4 +1,6 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+use ordered_float::OrderedFloat;
 
 use crate::{
     artifact::{Artifact, ArtifactType},
@@ -112,6 +114,26 @@ impl NHintsProvider {
             })();
             n_hints.insert(insertion_index, item);
         }
+        let is_root = {
+            let mut ret = HashMap::new();
+            for (index, item) in n_hints.iter().enumerate() {
+                let has_previous_dep = n_hints[..index]
+                    .iter()
+                    .rposition(|entry| reverse_dependencies[&entry].contains(&item))
+                    .is_some();
+
+                let time = old_timings
+                    .get(item)
+                    .map(|d| OrderedFloat(d.duration))
+                    .unwrap_or_default();
+
+                ret.insert(item.clone(), (has_previous_dep, time));
+            }
+            ret
+        };
+        n_hints.sort_by_cached_key(|item| {
+            (is_root.get(item).copied().unwrap_or_default(), item.clone())
+        });
         let inner = CargoHints::new(dependencies);
         Box::new(Self {
             timings,
@@ -143,7 +165,7 @@ impl HintProvider for NHintsProvider {
                     .unwrap_or_default()
             })
             .cloned();
-        let key = direct_hit.map(|d| dbg!(d)).or_else(|| {
+        let key = direct_hit.or_else(|| {
             timings
                 .iter()
                 .filter_map(|artifact| {
